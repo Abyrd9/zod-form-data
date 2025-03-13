@@ -1,0 +1,23 @@
+{
+  "name": "zod-form-data-monorepo",
+  "private": true,
+  "resolutions": {
+    "react": "19.0.0-rc.1",
+    "react-dom": "19.0.0-rc.1"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "harbor": {
+    "domain": "localhost",
+    "useSudo": false,
+    "services": [
+      {
+        "name": "lib-example",
+        "path": "packages/lib-example",
+        "subdomain": "lib-example",
+        "command": "bun run dev"
+      }
+    ]
+  }
+}
