@@ -110,3 +110,27 @@ export const parseZodFormData = <T extends ZodObjectOrEffects>(
 		return { success: false, errors: {} };
 	}
 };
+
+export const parseZodData = <T extends ZodObjectOrEffects>(
+	data: z.infer<T>,
+	{
+		schema,
+	}: {
+		schema: T;
+	},
+): ParseResult<T> => {
+	try {
+		const validatedData = schema.parse(data);
+		return { success: true, data: validatedData };
+	} catch (error) {
+		if (error instanceof ZodError) {
+			const errors: Record<string, string> = {};
+			for (const zodError of error.errors) {
+				const path = zodError.path[0].toString();
+				errors[path] = zodError.message;
+			}
+			return { success: false, errors };
+		}
+		return { success: false, errors: {} };
+	}
+};
