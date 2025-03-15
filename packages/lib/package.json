@@ -1,6 +1,6 @@
 {
   "name": "@abyrd9/zod-form-data",
-  "version": "0.0.11",
+  "version": "0.1.2",
   "description": "A Zod-based form data validation library",
   "license": "MIT",
   "keywords": [
@@ -11,24 +11,20 @@
     "react"
   ],
   "module": "./index.ts",
-  "types": "./index.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "type": "module",
   "files": [
-    "index.ts",
-    "src"
+    "dist/src",
+    "dist/*.js",
+    "dist/*.d.ts"
   ],
-  "exports": {
-    ".": {
-      "types": "./index.ts",
-      "import": "./index.ts",
-      "default": "./index.ts"
-    }
-  },
   "devDependencies": {
     "@happy-dom/global-registrator": "^17.4.4",
     "@testing-library/dom": "^10.4.0",
     "@types/bun": "latest",
     "@types/react": "^19.0.10",
+    "rimraf": "^6.0.1",
     "vitest": "^3.0.8"
   },
   "peerDependencies": {
@@ -55,9 +51,11 @@
     "test": "bun test",
     "test:watch": "bun test --watch",
     "update": "npx npm-check-updates -u",
-    "publish:patch": "npm version patch && bun publish",
-    "publish:minor": "npm version minor && bun publish",
-    "publish:major": "npm version major && bun publish"
+    "clean": "rm -rf dist",
+    "build": "bun run clean && bun build ./index.ts --outdir ./dist --target node --format esm && tsc",
+    "publish:patch": "bun run build && npm version patch && bun publish",
+    "publish:minor": "bun run build && npm version minor && bun publish",
+    "publish:major": "bun run build && npm version major && bun publish"
   },
   "dependencies": {
     "@testing-library/react": "^16.2.0"
