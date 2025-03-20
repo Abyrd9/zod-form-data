@@ -3,7 +3,7 @@ import type { DeepPartial } from "./deep-partial";
 import type {  ZodObjectOrEffects } from ".";
 
 export function flattenZodFormErrors<T extends ZodObjectOrEffects>(
-	errors?: DeepPartial<z.infer<T>>,
+	errors?: DeepPartial<z.infer<T>> | null,
 ) {
 	if (!errors) return new Map<string, string>();
 

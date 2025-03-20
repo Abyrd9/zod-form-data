@@ -132,7 +132,7 @@ export const useZodForm = <Schema extends ZodObjectOrEffects>({
 }: {
   schema: Schema;
   defaultValues?: DeepPartial<z.infer<Schema>>;
-  errors?: DeepPartial<NestedFieldErrors<Schema>>;
+  errors?: DeepPartial<NestedFieldErrors<Schema>> | null;
 }) => {
   const [flattenedData, setFlattenedData] = useState(() => {
     const zodDefaults = extractZodDefaults(schema);
