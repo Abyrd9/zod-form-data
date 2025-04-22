@@ -1,51 +1,77 @@
-import { z } from "zod";
+import { type ZodFirstPartySchemaTypes, ZodFirstPartyTypeKind, z } from "zod";
 import type { ZodObjectOrEffects } from ".";
 
 export function flattenZodFormSchema<T extends ZodObjectOrEffects>(
-	schema: T,
+  schema: T
 ): z.ZodObject<z.ZodRawShape> {
-	const flattenedSchemaMap = new Map<string, z.ZodTypeAny>();
+  const flattenedSchemaMap = new Map<string, z.ZodTypeAny>();
 
-	function flatten(subSchema: z.ZodTypeAny, prefix = "") {
-		let currentSubSchema = subSchema;
-		if (currentSubSchema instanceof z.ZodEffects) {
-			currentSubSchema = currentSubSchema.innerType();
-		}
+  function flatten(subSchema: z.ZodTypeAny, prefix = "") {
+    let currentSubSchema = subSchema;
+    const def = (currentSubSchema as ZodFirstPartySchemaTypes)._def;
 
-		if (currentSubSchema instanceof z.ZodObject) {
-			for (const [key, value] of Object.entries(currentSubSchema.shape)) {
-				const newPrefix = prefix ? `${prefix}.${key}` : key;
-				flatten(value as z.ZodTypeAny, newPrefix);
-			}
-		} else if (currentSubSchema instanceof z.ZodArray) {
-			flatten(currentSubSchema.element, `${prefix}.#`);
-		} else if (
-			currentSubSchema instanceof z.ZodUnion ||
-			currentSubSchema instanceof z.ZodDiscriminatedUnion
-		) {
-			currentSubSchema.options.forEach(
-				(option: z.ZodTypeAny, index: number) => {
-					flatten(option, `${prefix}`);
-				},
-			);
-		} else if (currentSubSchema instanceof z.ZodLazy) {
-			const lazyValue = currentSubSchema._def.getter();
-			flatten(lazyValue, prefix);
-		} else if (currentSubSchema instanceof z.ZodOptional) {
-			const inner = currentSubSchema._def.innerType;
-			console.log(prefix, inner.isOptional());
-			flatten(inner, prefix);
-		} else if (currentSubSchema instanceof z.ZodDefault) {
-			const inner = currentSubSchema._def.innerType;
-			flatten(inner, prefix);
-		} else if (currentSubSchema instanceof z.ZodRecord) {
-			flatten(currentSubSchema._def.valueType, `${prefix}.*`);
-		} else {
-			flattenedSchemaMap.set(prefix, subSchema);
-		}
-	}
+    if (def.typeName === ZodFirstPartyTypeKind.ZodEffects) {
+      currentSubSchema = (
+        currentSubSchema as z.ZodEffects<z.ZodTypeAny>
+      ).innerType();
+    }
 
-	flatten(schema);
+    switch (def.typeName) {
+      case ZodFirstPartyTypeKind.ZodObject: {
+        for (const [key, value] of Object.entries(
+          (currentSubSchema as z.ZodObject<z.ZodRawShape>).shape
+        )) {
+          const newPrefix = prefix ? `${prefix}.${key}` : key;
+          flatten(value as z.ZodTypeAny, newPrefix);
+        }
+        break;
+      }
+      case ZodFirstPartyTypeKind.ZodArray: {
+        flatten(
+          (currentSubSchema as z.ZodArray<z.ZodTypeAny>).element,
+          `${prefix}.#`
+        );
+        break;
+      }
+      case ZodFirstPartyTypeKind.ZodUnion:
+      case ZodFirstPartyTypeKind.ZodDiscriminatedUnion: {
+        (
+          currentSubSchema as z.ZodUnion<
+            readonly [z.ZodTypeAny, ...z.ZodTypeAny[]]
+          >
+        ).options.forEach((option: z.ZodTypeAny, index: number) => {
+          flatten(option, `${prefix}`);
+        });
+        break;
+      }
+      case ZodFirstPartyTypeKind.ZodLazy: {
+        const lazyValue = currentSubSchema._def.getter();
+        flatten(lazyValue, prefix);
+        break;
+      }
+      case ZodFirstPartyTypeKind.ZodOptional: {
+        const inner = currentSubSchema._def.innerType;
+        console.log(prefix, inner.isOptional());
+        flatten(inner, prefix);
+        break;
+      }
+      case ZodFirstPartyTypeKind.ZodDefault: {
+        const inner = currentSubSchema._def.innerType;
+        flatten(inner, prefix);
+        break;
+      }
+      case ZodFirstPartyTypeKind.ZodRecord: {
+        flatten(currentSubSchema._def.valueType, `${prefix}.*`);
+        break;
+      }
+      default: {
+        flattenedSchemaMap.set(prefix, subSchema);
+        break;
+      }
+    }
+  }
 
-	return z.object(Object.fromEntries(flattenedSchemaMap));
+  flatten(schema);
+
+  return z.object(Object.fromEntries(flattenedSchemaMap));
 }

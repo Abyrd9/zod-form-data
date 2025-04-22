@@ -1,6 +1,6 @@
 {
   "name": "@abyrd9/zod-form-data",
-  "version": "0.1.2",
+  "version": "0.1.10",
   "description": "A Zod-based form data validation library",
   "license": "MIT",
   "keywords": [
@@ -10,28 +10,33 @@
     "typescript",
     "react"
   ],
-  "module": "./index.ts",
   "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
-  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
   "files": [
-    "dist/src",
-    "dist/*.js",
-    "dist/*.d.ts"
+    "dist"
   ],
   "devDependencies": {
     "@happy-dom/global-registrator": "^17.4.4",
     "@testing-library/dom": "^10.4.0",
     "@types/bun": "latest",
-    "@types/react": "^19.0.10",
+    "@types/react": "^19.1.2",
     "rimraf": "^6.0.1",
-    "vitest": "^3.0.8"
+    "tsup": "^8.4.0",
+    "vitest": "^3.1.2"
   },
   "peerDependencies": {
-    "typescript": "^5.7.2",
-    "react": "^19.0.0-rc.1",
+    "react": "^19.1.0",
     "react-dom": ">=18.0.0",
-    "zod": "^3.23.8"
+    "typescript": "^5.8.3",
+    "zod": "^3.24.3"
   },
   "peerDependenciesMeta": {
     "typescript": {
@@ -52,12 +57,13 @@
     "test:watch": "bun test --watch",
     "update": "npx npm-check-updates -u",
     "clean": "rm -rf dist",
-    "build": "bun run clean && bun build ./index.ts --outdir ./dist --target node --format esm && tsc",
+    "build": "tsup",
+    "build:watch": "tsup --watch",
     "publish:patch": "bun run build && npm version patch && bun publish",
     "publish:minor": "bun run build && npm version minor && bun publish",
     "publish:major": "bun run build && npm version major && bun publish"
   },
   "dependencies": {
-    "@testing-library/react": "^16.2.0"
+    "@testing-library/react": "^16.3.0"
   }
 }

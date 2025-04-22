@@ -53,7 +53,14 @@ export function coerceFormData<Schema extends ZodTypeAny>(
       break;
     case ZodFirstPartyTypeKind.ZodNumber:
       schema = any()
-        .transform((value) => NumAsString.parse(value))
+        .transform((value) => {
+          // First try to coerce to number
+          const coerced = z.coerce.number().safeParse(value);
+          if (coerced.success) return coerced.data;
+          
+          // If that fails, try parsing as string
+          return NumAsString.parse(value);
+        })
         .pipe(type);
       break;
     case ZodFirstPartyTypeKind.ZodBoolean:
@@ -63,11 +70,7 @@ export function coerceFormData<Schema extends ZodTypeAny>(
       break;
     case ZodFirstPartyTypeKind.ZodDate:
       schema = any()
-        .transform((value) => {
-          console.log(value);
-          console.log(DateAsString.parse(value));
-          return DateAsString.parse(value);
-        })
+        .transform((value) => DateAsString.parse(value))
         .pipe(type);
       break;
     case ZodFirstPartyTypeKind.ZodArray:
@@ -94,7 +97,7 @@ export function coerceFormData<Schema extends ZodTypeAny>(
       schema = coerceFormData(def.schema);
       break;
     default:
-      console.error(`Unsupported Zod type: ${def.typeName}`);
+      console.error(`Zod type not handled in coerceFormData: ${def.typeName}`);
       break;
   }
 

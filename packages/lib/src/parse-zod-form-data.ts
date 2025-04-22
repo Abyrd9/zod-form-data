@@ -1,136 +1,157 @@
-import { ZodError, type ZodIssue, type z } from "zod";
-import type { DeepPartial } from "./deep-partial";
+import { ZodError, type z } from "zod";
 import type { NestedFieldErrors, ZodObjectOrEffects } from ".";
 import { coerceFormData } from "./coerce-form-data";
+import type { DeepPartial } from "./deep-partial";
 import { flattenZodFormSchema } from "./flatten-zod-form-schema";
 import { unflattenZodFormData } from "./unflatten-zod-form-data";
 import { unflattenZodFormErrors } from "./unflatten-zod-form-errors";
 
 type ParseResult<T extends ZodObjectOrEffects> =
-	| { success: true; data: z.infer<T> }
-	| {
-			success: false;
-			errors: DeepPartial<NestedFieldErrors<T>> | Record<string, string>;
-	  };
+  | { success: true; data: z.infer<T> }
+  | {
+      success: false;
+      errors: DeepPartial<NestedFieldErrors<T>> | Record<string, string>;
+    };
 
 function matchWildcardString(pattern: string, key: string): boolean {
-	const patternParts = pattern.split(".");
-	const testParts = key.split(".");
+  const patternParts = pattern.split(".");
+  const testParts = key.split(".");
 
-	if (patternParts.length !== testParts.length) {
-		return false;
-	}
+  if (patternParts.length !== testParts.length) {
+    return false;
+  }
 
-	return patternParts.every((part, index) => {
-		return part === "*" || part === testParts[index];
-	});
+  return patternParts.every((part, index) => {
+    return part === "*" || part === testParts[index];
+  });
 }
 
 export const parseZodFormData = <T extends ZodObjectOrEffects>(
-	form: FormData,
-	{
-		schema,
-	}: {
-		schema: T;
-	},
+  form: FormData,
+  {
+    schema,
+  }: {
+    schema: T;
+  }
 ): ParseResult<T> => {
-	const result: Record<string, unknown> = {};
-	const errors: Record<string, string> = {};
+  const result: Record<string, unknown> = {};
+  const errors: Record<string, string> = {};
 
-	const flattenedZodSchema = flattenZodFormSchema(schema);
+  // Get the flattened schema for type coercion
+  const flattenedZodSchema = flattenZodFormSchema(schema);
 
-	for (const [key, formDataValue] of form.entries()) {
-		const keyWithHash = key.replace(/(\d+)/g, "#");
+  // First pass: Coerce values to their correct types
+  for (const [key, formDataValue] of form.entries()) {
+    const keyWithHash = key.replace(/(\d+)/g, "#");
+    
+    // Try to find the matching schema for coercion
+    const matchingSchema = flattenedZodSchema.shape[keyWithHash] ||
+      Object.entries(flattenedZodSchema.shape)
+        .find(([k]) => k.includes("*") && matchWildcardString(k, keyWithHash))?.[1];
+    
+    if (matchingSchema) {
+      try {
+        // For numbers, first try to coerce to number
+        if (matchingSchema._def.typeName === "ZodNumber") {
+          const num = Number(formDataValue);
+          if (!isNaN(num)) {
+            result[key] = num;
+          } else {
+            errors[key] = "Expected number, received string";
+            result[key] = formDataValue;
+          }
+        } else {
+          // Use coerceFormData for other types
+          const coercedValue = coerceFormData(matchingSchema).parse(formDataValue);
+          result[key] = coercedValue;
+        }
+      } catch (error) {
+        if (error instanceof ZodError) {
+          for (const zodError of error.errors) {
+            const path = zodError.path.join(".");
+            if (path) {  // Only add errors with non-empty paths
+              errors[path] = zodError.message;
+            }
+          }
+        } else {
+          errors[key] = "An unexpected error occurred during coercion";
+        }
+        result[key] = formDataValue;
+      }
+    } else {
+      result[key] = formDataValue;
+    }
+  }
 
-		if (keyWithHash in flattenedZodSchema.shape) {
-			const keySchema = flattenedZodSchema.shape[keyWithHash];
-			try {
-				result[key] = coerceFormData(keySchema).parse(formDataValue);
-			} catch (error) {
-				if (error instanceof ZodError) {
-					console.log("Zod error", error);
-					errors[key] = error.errors[0].message;
-				} else {
-					console.error(error);
-					errors[key] = "An unexpected error occurred";
-				}
-			}
+  // Second pass: Validate the coerced data
+  try {
+    const unflattenedData = unflattenZodFormData(result);
+    const validatedData = schema.safeParse(unflattenedData);
+    
+    if (!validatedData.success) {
+      const validationErrors: Record<string, string> = {};
+      for (const error of validatedData.error.errors) {
+        const path = error.path.join(".");
+        if (path) {  // Only add errors with non-empty paths
+          validationErrors[path] = error.message;
+        }
+      }
+      // Merge validation errors with coercion errors, preferring validation errors
+      const finalErrors = { ...errors, ...validationErrors };
+      return { success: false, errors: finalErrors };
+    } else {
+      return { success: true, data: validatedData.data };
+    }
+  } catch (error) {
+    if (error instanceof ZodError) {
+      for (const zodError of error.errors) {
+        const path = zodError.path.join(".");
+        if (!errors[path]) {
+          errors[path] = zodError.message;
+        }
+      }
+    }
+  }
 
-			continue;
-		}
+  // If we have any errors, return them
+  if (Object.keys(errors).length > 0) {
+    return { success: false, errors };
+  }
 
-		const keysWithRecordShape = Object.keys(flattenedZodSchema.shape).filter(
-			(key) => key.includes("*"),
-		);
-
-		const keyWithRecordShape = keysWithRecordShape.find((key) => {
-			return matchWildcardString(key, keyWithHash);
-		});
-
-		if (keyWithRecordShape) {
-			const keySchema = flattenedZodSchema.shape[keyWithRecordShape];
-
-			try {
-				result[key] = coerceFormData(keySchema).parse(formDataValue);
-			} catch (error) {
-				if (error instanceof ZodError) {
-					errors[key] = error.errors[0].message;
-				} else {
-					console.error(error);
-					errors[key] = "An unexpected error occurred";
-				}
-			}
-		}
-	}
-
-	// Check for missing required fields
-	for (const [key, fieldSchema] of Object.entries(flattenedZodSchema.shape)) {
-		if (!key.includes("*") && !(key in result) && !fieldSchema.isOptional()) {
-			console.warn("Missing field in form", key);
-		}
-	}
-
-	if (Object.keys(errors).length > 0) {
-		const unflattenedErrors = unflattenZodFormErrors<T>(errors);
-		return { success: false, errors: unflattenedErrors };
-	}
-
-	try {
-		const unflattenedData = unflattenZodFormData(result);
-		return { success: true, data: schema.parse(unflattenedData) };
-	} catch (error) {
-		if (error instanceof ZodError) {
-			const errors: Record<string, string> = {};
-			for (const zodError of error.errors) {
-				console.log("Zod error not caught:", zodError);
-				errors[zodError.path[0]] = zodError.message;
-			}
-			return { success: false, errors };
-		}
-		return { success: false, errors: {} };
-	}
+  return { success: false, errors: {} };
 };
 
 export const parseZodData = <T extends ZodObjectOrEffects>(
-	data: z.infer<T>,
-	{
-		schema,
-	}: {
-		schema: T;
-	},
+  data: z.infer<T>,
+  {
+    schema,
+  }: {
+    schema: T;
+  }
 ): ParseResult<T> => {
-	try {
-		const validatedData = schema.parse(data);
-		return { success: true, data: validatedData };
-	} catch (error) {
-		if (error instanceof ZodError) {
-			const errors: Record<string, string> = {};
-			for (const zodError of error.errors) {
-				const path = zodError.path[0].toString();
-				errors[path] = zodError.message;
-			}
-			return { success: false, errors };
-		}
-		return { success: false, errors: {} };
-	}
+  try {
+    // Use safeParse instead of parse to handle errors more gracefully
+    const validatedData = schema.safeParse(data);
+    
+    if (!validatedData.success) {
+      const errors: Record<string, string> = {};
+      for (const error of validatedData.error.errors) {
+        const path = error.path.join(".");
+        errors[path] = error.message;
+      }
+      return { success: false, errors };
+    }
+    
+    return { success: true, data: validatedData.data };
+  } catch (error) {
+    if (error instanceof ZodError) {
+      const errors: Record<string, string> = {};
+      for (const zodError of error.errors) {
+        const path = zodError.path.join(".");
+        errors[path] = zodError.message;
+      }
+      return { success: false, errors };
+    }
+    return { success: false, errors: {} };
+  }
 };

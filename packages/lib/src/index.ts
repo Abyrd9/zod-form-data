@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import type { DeepPartial } from "./deep-partial";
+import { extractZodDefaults } from "./extract-zod-defaults";
 import { flattenZodFormData } from "./flatten-zod-form-data";
 import { flattenZodFormErrors } from "./flatten-zod-form-errors";
 import { unflattenZodFormData } from "./unflatten-zod-form-data";
-import { extractZodDefaults } from "./extract-zod-defaults";
 
 export type ZodObjectOrEffects =
   | z.ZodObject<z.ZodRawShape>
@@ -125,6 +125,11 @@ type ArrayPaths<T extends ZodObjectOrEffects> = T extends z.ZodEffects<
     }[keyof Shape]
   : never;
 
+// A form is a flattened collection of fields
+// - sub fields should be . delimited
+// - array fields should be [#] delimited
+// When we pass in the schema, we should be able to determine what the form field names should be.
+
 export const useZodForm = <Schema extends ZodObjectOrEffects>({
   schema,
   defaultValues,
@@ -163,13 +168,21 @@ export const useZodForm = <Schema extends ZodObjectOrEffects>({
       field: T,
       path: string[] = []
     ): NestedFields<T> => {
-      if (field instanceof z.ZodEffects) {
-        return getFieldProps(field.innerType(), path) as NestedFields<T>;
+      if (
+        field instanceof z.ZodEffects ||
+        field._def.typeName === "ZodEffects"
+      ) {
+        return getFieldProps(
+          (field as unknown as z.ZodEffects<z.ZodTypeAny>).innerType(),
+          path
+        ) as NestedFields<T>;
       }
 
-      if (field instanceof z.ZodObject) {
+      if (field instanceof z.ZodObject || field._def.typeName === "ZodObject") {
         const objectFields: Record<string, unknown> = {};
-        for (const [key, subField] of Object.entries(field.shape)) {
+        for (const [key, subField] of Object.entries(
+          (field as unknown as z.ZodObject<z.ZodRawShape>).shape
+        )) {
           objectFields[key] = getFieldProps(subField as z.ZodTypeAny, [
             ...path,
             key,
@@ -179,7 +192,7 @@ export const useZodForm = <Schema extends ZodObjectOrEffects>({
         return objectFields as NestedFields<T>;
       }
 
-      if (field instanceof z.ZodArray) {
+      if (field instanceof z.ZodArray || field._def.typeName === "ZodArray") {
         const arrayPath = path.join(".") as ZodPaths<Schema>;
 
         const nested = unflattenZodFormData<z.infer<typeof field>>(
@@ -189,7 +202,10 @@ export const useZodForm = <Schema extends ZodObjectOrEffects>({
 
         return (
           (nested?.map((_: unknown, index: number) =>
-            getFieldProps(field.element, [...path, index.toString()])
+            getFieldProps(
+              (field as unknown as z.ZodArray<z.ZodTypeAny>).element,
+              [...path, index.toString()]
+            )
           ) as NestedFields<T>) ?? []
         );
       }

@@ -23,6 +23,8 @@ export default function Home() {
     errors: fetcher.data?.success ? undefined : fetcher.data?.errors,
   });
 
+  console.log(fields)
+
   return (
     <main>
       <fetcher.Form method="post">
