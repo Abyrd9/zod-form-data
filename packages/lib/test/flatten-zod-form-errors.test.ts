@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { flattenZodFormErrors } from "../src/flatten-zod-form-errors";
 import type { NestedFieldErrors } from "../src";
-import { z } from "zod";
+import { z } from "zod/v4";
 
 describe("flattenZodFormErrors", () => {
   test("returns empty Map when no errors provided", () => {

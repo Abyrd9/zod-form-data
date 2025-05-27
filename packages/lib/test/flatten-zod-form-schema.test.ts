@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { z } from "zod";
+import { z } from "zod/v4";
 import { flattenZodFormSchema } from "../src/flatten-zod-form-schema";
 
 describe("flattenZodFormSchema", () => {
@@ -107,7 +107,6 @@ describe("flattenZodFormSchema", () => {
       "name",
     ].sort());
 
-    console.log(flattened.shape.age.isOptional());
     expect(flattened.shape.age.isOptional()).toBe(true);
     expect(flattened.shape["address.city"].isOptional()).toBe(true);
   });

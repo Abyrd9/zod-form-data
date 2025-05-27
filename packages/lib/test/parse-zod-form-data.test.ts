@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { z } from "zod";
+import { z } from "zod/v4";
 import { parseZodFormData } from "../src/parse-zod-form-data";
 
 describe("parseZodFormData", () => {
@@ -25,7 +25,7 @@ describe("parseZodFormData", () => {
 
   test("handles validation errors", () => {
     const schema = z.object({
-      email: z.string().email(),
+      email: z.email(),
       age: z.number().min(18),
     });
 
@@ -37,8 +37,8 @@ describe("parseZodFormData", () => {
     expect(result).toEqual({
       success: false,
       errors: {
-        email: "Invalid email",
-        age: "Number must be greater than or equal to 18",
+        age: "Too small: expected number to be >=18",
+        email: "Invalid email address",
       },
     });
   });
@@ -190,7 +190,7 @@ describe("parseZodFormData", () => {
   test("handles missing required fields", () => {
     const schema = z.object({
       name: z.string(),
-      email: z.string().email(),
+      email: z.email(),
     });
 
     const formData = new FormData();
@@ -200,7 +200,7 @@ describe("parseZodFormData", () => {
     expect(result).toEqual({
       success: false,
       errors: {
-        email: "Required",
+        email: "Invalid input: expected string, received undefined",
       },
     });
   });

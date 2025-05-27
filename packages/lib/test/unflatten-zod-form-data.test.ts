@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { unflattenZodFormData } from "../src/unflatten-zod-form-data";
-import { z } from "zod";
+import { z } from "zod/v4";
 
 describe("unflattenZodFormData", () => {
   test("unflattens basic object data", () => {

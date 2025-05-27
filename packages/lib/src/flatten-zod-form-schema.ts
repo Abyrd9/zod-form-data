@@ -1,74 +1,59 @@
-import { type ZodFirstPartySchemaTypes, ZodFirstPartyTypeKind, z } from "zod";
-import type { ZodObjectOrEffects } from ".";
+import { z } from "zod/v4";
+import type { ZodFormSchema } from ".";
+import { ZodFirstPartyTypeKind } from "zod";
+import { $ZodType } from "zod/v4/core";
 
-export function flattenZodFormSchema<T extends ZodObjectOrEffects>(
+export function flattenZodFormSchema<T extends ZodFormSchema>(
   schema: T
 ): z.ZodObject<z.ZodRawShape> {
-  const flattenedSchemaMap = new Map<string, z.ZodTypeAny>();
+  const flattenedSchemaMap = new Map<string, z.ZodType>();
 
-  function flatten(subSchema: z.ZodTypeAny, prefix = "") {
+  function flatten(subSchema: $ZodType, prefix = "") {
     let currentSubSchema = subSchema;
-    const def = (currentSubSchema as ZodFirstPartySchemaTypes)._def;
 
-    if (def.typeName === ZodFirstPartyTypeKind.ZodEffects) {
-      currentSubSchema = (
-        currentSubSchema as z.ZodEffects<z.ZodTypeAny>
-      ).innerType();
+
+    if (currentSubSchema instanceof z.ZodObject) {
+      for (const [key, value] of Object.entries(currentSubSchema.shape)) {
+        const newPrefix = prefix ? `${prefix}.${key}` : key;
+        flatten(value as z.ZodType, newPrefix);
+      }
+      return;
     }
 
-    switch (def.typeName) {
-      case ZodFirstPartyTypeKind.ZodObject: {
-        for (const [key, value] of Object.entries(
-          (currentSubSchema as z.ZodObject<z.ZodRawShape>).shape
-        )) {
-          const newPrefix = prefix ? `${prefix}.${key}` : key;
-          flatten(value as z.ZodTypeAny, newPrefix);
-        }
-        break;
-      }
-      case ZodFirstPartyTypeKind.ZodArray: {
-        flatten(
-          (currentSubSchema as z.ZodArray<z.ZodTypeAny>).element,
-          `${prefix}.#`
-        );
-        break;
-      }
-      case ZodFirstPartyTypeKind.ZodUnion:
-      case ZodFirstPartyTypeKind.ZodDiscriminatedUnion: {
-        (
-          currentSubSchema as z.ZodUnion<
-            readonly [z.ZodTypeAny, ...z.ZodTypeAny[]]
-          >
-        ).options.forEach((option: z.ZodTypeAny, index: number) => {
-          flatten(option, `${prefix}`);
-        });
-        break;
-      }
-      case ZodFirstPartyTypeKind.ZodLazy: {
-        const lazyValue = currentSubSchema._def.getter();
-        flatten(lazyValue, prefix);
-        break;
-      }
-      case ZodFirstPartyTypeKind.ZodOptional: {
-        const inner = currentSubSchema._def.innerType;
-        console.log(prefix, inner.isOptional());
-        flatten(inner, prefix);
-        break;
-      }
-      case ZodFirstPartyTypeKind.ZodDefault: {
-        const inner = currentSubSchema._def.innerType;
-        flatten(inner, prefix);
-        break;
-      }
-      case ZodFirstPartyTypeKind.ZodRecord: {
-        flatten(currentSubSchema._def.valueType, `${prefix}.*`);
-        break;
-      }
-      default: {
-        flattenedSchemaMap.set(prefix, subSchema);
-        break;
-      }
+    if (currentSubSchema instanceof z.ZodArray) {
+      flatten(currentSubSchema.element, `${prefix}.#`);
+      return;
     }
+
+    if (currentSubSchema instanceof z.ZodUnion || currentSubSchema instanceof z.ZodDiscriminatedUnion) {
+      for (const option of currentSubSchema.options) {
+        flatten(option as z.ZodType, prefix);
+      }
+      return;
+    }
+
+    if (currentSubSchema instanceof z.ZodLazy) {
+      const lazyValue = currentSubSchema.def.getter();
+      flatten(lazyValue, prefix);
+      return;
+    }
+
+    if (currentSubSchema instanceof z.ZodOptional) {
+      flatten(currentSubSchema.def.innerType, prefix);
+      return;
+    }
+
+    if (currentSubSchema instanceof z.ZodDefault) {
+      flatten(currentSubSchema.def.innerType, prefix);
+      return;
+    }
+
+    if (currentSubSchema instanceof z.ZodRecord) {
+      flatten(currentSubSchema.def.valueType, `${prefix}.*`);
+      return;
+    }
+
+    flattenedSchemaMap.set(prefix, subSchema as z.ZodType);
   }
 
   flatten(schema);

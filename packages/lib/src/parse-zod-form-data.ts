@@ -1,12 +1,11 @@
-import { ZodError, type z } from "zod";
-import type { NestedFieldErrors, ZodObjectOrEffects } from ".";
+import { ZodError, z } from "zod/v4";
+import type { NestedFieldErrors, ZodFormSchema } from ".";
 import { coerceFormData } from "./coerce-form-data";
 import type { DeepPartial } from "./deep-partial";
 import { flattenZodFormSchema } from "./flatten-zod-form-schema";
 import { unflattenZodFormData } from "./unflatten-zod-form-data";
-import { unflattenZodFormErrors } from "./unflatten-zod-form-errors";
 
-type ParseResult<T extends ZodObjectOrEffects> =
+type ParseResult<T extends ZodFormSchema> =
   | { success: true; data: z.infer<T> }
   | {
       success: false;
@@ -26,7 +25,7 @@ function matchWildcardString(pattern: string, key: string): boolean {
   });
 }
 
-export const parseZodFormData = <T extends ZodObjectOrEffects>(
+export const parseZodFormData = <T extends ZodFormSchema>(
   form: FormData,
   {
     schema,
@@ -43,17 +42,20 @@ export const parseZodFormData = <T extends ZodObjectOrEffects>(
   // First pass: Coerce values to their correct types
   for (const [key, formDataValue] of form.entries()) {
     const keyWithHash = key.replace(/(\d+)/g, "#");
-    
+
     // Try to find the matching schema for coercion
-    const matchingSchema = flattenedZodSchema.shape[keyWithHash] ||
-      Object.entries(flattenedZodSchema.shape)
-        .find(([k]) => k.includes("*") && matchWildcardString(k, keyWithHash))?.[1];
-    
+    const matchingSchema =
+      flattenedZodSchema.shape[keyWithHash] ||
+      Object.entries(flattenedZodSchema.shape).find(
+        ([k]) => k.includes("*") && matchWildcardString(k, keyWithHash)
+      )?.[1];
+
     if (matchingSchema) {
       try {
         // For numbers, first try to coerce to number
-        if (matchingSchema._def.typeName === "ZodNumber") {
+        if (matchingSchema instanceof z.ZodNumber) {
           const num = Number(formDataValue);
+          console.log("NUM", num)
           if (!isNaN(num)) {
             result[key] = num;
           } else {
@@ -62,14 +64,17 @@ export const parseZodFormData = <T extends ZodObjectOrEffects>(
           }
         } else {
           // Use coerceFormData for other types
-          const coercedValue = coerceFormData(matchingSchema).parse(formDataValue);
+          const coercedValue = coerceFormData(
+            matchingSchema as z.ZodType
+          ).parse(formDataValue);
           result[key] = coercedValue;
         }
       } catch (error) {
         if (error instanceof ZodError) {
-          for (const zodError of error.errors) {
+          for (const zodError of error.issues) {
             const path = zodError.path.join(".");
-            if (path) {  // Only add errors with non-empty paths
+            if (path) {
+              // Only add errors with non-empty paths
               errors[path] = zodError.message;
             }
           }
@@ -87,12 +92,13 @@ export const parseZodFormData = <T extends ZodObjectOrEffects>(
   try {
     const unflattenedData = unflattenZodFormData(result);
     const validatedData = schema.safeParse(unflattenedData);
-    
+
     if (!validatedData.success) {
       const validationErrors: Record<string, string> = {};
-      for (const error of validatedData.error.errors) {
+      for (const error of validatedData.error.issues) {
         const path = error.path.join(".");
-        if (path) {  // Only add errors with non-empty paths
+        if (path) {
+          // Only add errors with non-empty paths
           validationErrors[path] = error.message;
         }
       }
@@ -104,7 +110,7 @@ export const parseZodFormData = <T extends ZodObjectOrEffects>(
     }
   } catch (error) {
     if (error instanceof ZodError) {
-      for (const zodError of error.errors) {
+      for (const zodError of error.issues) {
         const path = zodError.path.join(".");
         if (!errors[path]) {
           errors[path] = zodError.message;
@@ -121,7 +127,7 @@ export const parseZodFormData = <T extends ZodObjectOrEffects>(
   return { success: false, errors: {} };
 };
 
-export const parseZodData = <T extends ZodObjectOrEffects>(
+export const parseZodData = <T extends ZodFormSchema>(
   data: z.infer<T>,
   {
     schema,
@@ -132,21 +138,21 @@ export const parseZodData = <T extends ZodObjectOrEffects>(
   try {
     // Use safeParse instead of parse to handle errors more gracefully
     const validatedData = schema.safeParse(data);
-    
+
     if (!validatedData.success) {
       const errors: Record<string, string> = {};
-      for (const error of validatedData.error.errors) {
+      for (const error of validatedData.error.issues) {
         const path = error.path.join(".");
         errors[path] = error.message;
       }
       return { success: false, errors };
     }
-    
+
     return { success: true, data: validatedData.data };
   } catch (error) {
     if (error instanceof ZodError) {
       const errors: Record<string, string> = {};
-      for (const zodError of error.errors) {
+      for (const zodError of error.issues) {
         const path = zodError.path.join(".");
         errors[path] = zodError.message;
       }

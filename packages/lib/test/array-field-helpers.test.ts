@@ -1,7 +1,7 @@
 /// <reference lib="dom" />
 
 import { describe, expect, test } from "vitest";
-import { z } from "zod";
+import { z } from "zod/v4";
 import { useZodForm } from "../src";
 import { renderHook, act } from "@testing-library/react";
 

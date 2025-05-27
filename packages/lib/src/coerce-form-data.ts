@@ -1,12 +1,7 @@
 import {
-  type ZodFirstPartySchemaTypes,
-  ZodFirstPartyTypeKind,
-  type ZodType,
-  type ZodTypeAny,
-  any,
-  type output,
+
   z,
-} from "zod";
+} from "zod/v4";
 
 const BoolAsString = z
   .string()
@@ -31,29 +26,27 @@ const DateAsString = z
   .regex(/^\d{4}-\d{2}-\d{2}$/, "Must be a date string (YYYY-MM-DD)")
   .transform((val) => new Date(val));
 
-export function coerceFormData<Schema extends ZodTypeAny>(
+export function coerceFormData<Schema extends z.ZodType>(
   type: Schema
-): ZodType<output<Schema>> {
-  let schema: ZodTypeAny = type;
-  const def = (type as ZodFirstPartySchemaTypes)._def;
-
-  switch (def.typeName) {
-    case ZodFirstPartyTypeKind.ZodString:
-    case ZodFirstPartyTypeKind.ZodLiteral:
-    case ZodFirstPartyTypeKind.ZodEnum:
-    case ZodFirstPartyTypeKind.ZodNativeEnum:
-      schema = any()
-        .transform((value) => z.coerce.string().parse(value))
+): z.ZodType<z.output<Schema>> {
+  let schema: z.ZodType = type;
+  switch (schema.def.type) {
+    case "string":
+    case "literal":
+    case "enum":
+    case "enum":
+      schema = z.any()
+        .overwrite((value) => z.coerce.string().parse(value))
         .pipe(type);
       break;
-    case ZodFirstPartyTypeKind.ZodBigInt:
-      schema = any()
-        .transform((value) => IntAsString.parse(value))
+    case "bigint":
+      schema = z.any()
+        .overwrite((value) => IntAsString.parse(value))
         .pipe(type);
       break;
-    case ZodFirstPartyTypeKind.ZodNumber:
-      schema = any()
-        .transform((value) => {
+    case "number":
+      schema = z.any()
+        .overwrite((value) => {
           // First try to coerce to number
           const coerced = z.coerce.number().safeParse(value);
           if (coerced.success) return coerced.data;
@@ -63,41 +56,28 @@ export function coerceFormData<Schema extends ZodTypeAny>(
         })
         .pipe(type);
       break;
-    case ZodFirstPartyTypeKind.ZodBoolean:
-      schema = any()
-        .transform((value) => BoolAsString.parse(value))
+    case "boolean":
+      schema = z.any()
+        .overwrite((value) => BoolAsString.parse(value))
         .pipe(type);
       break;
-    case ZodFirstPartyTypeKind.ZodDate:
-      schema = any()
-        .transform((value) => DateAsString.parse(value))
+    case "date":
+      schema = z.any()
+        .overwrite((value) => DateAsString.parse(value))
         .pipe(type);
       break;
-    case ZodFirstPartyTypeKind.ZodArray:
+    case "array":
       schema = z.preprocess(
         (val) => (Array.isArray(val) ? val : val === undefined ? [] : [val]),
         type
       );
       break;
-    case ZodFirstPartyTypeKind.ZodNullable:
-    case ZodFirstPartyTypeKind.ZodOptional:
+    case "nullable":
+    case "optional":
       schema = z.preprocess((val) => (val === "" ? null : val), type);
       break;
-    case ZodFirstPartyTypeKind.ZodUnion:
-      schema = z.preprocess((val) => {
-        for (const unionType of def.options) {
-          try {
-            return coerceFormData(unionType).parse(val);
-          } catch {}
-        }
-        return val;
-      }, type);
-      break;
-    case ZodFirstPartyTypeKind.ZodEffects:
-      schema = coerceFormData(def.schema);
-      break;
     default:
-      console.error(`Zod type not handled in coerceFormData: ${def.typeName}`);
+      console.error(`Zod type not handled in coerceFormData: ${schema.def.type}`);
       break;
   }
 

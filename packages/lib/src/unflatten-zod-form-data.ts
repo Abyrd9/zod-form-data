@@ -1,8 +1,8 @@
-import type { z } from "zod";
-import type { ZodObjectOrEffects } from ".";
+import type { z } from "zod/v4";
+import type { ZodFormSchema } from ".";
 import type { DeepPartial } from "./deep-partial";
 
-export function unflattenZodFormData<T extends ZodObjectOrEffects>(
+export function unflattenZodFormData<T extends ZodFormSchema>(
   data: Record<string, unknown>,
   root?: string
 ): DeepPartial<z.infer<T>> {

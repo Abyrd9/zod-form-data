@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { unflattenZodFormErrors } from "../src/unflatten-zod-form-errors";
-import { z } from "zod";
+import { z } from "zod/v4";
 
 describe("unflattenZodFormErrors", () => {
   test("unflattens basic error messages", () => {
