@@ -1,6 +1,6 @@
 {
   "name": "@abyrd9/zod-form-data",
-  "version": "0.1.10",
+  "version": "1.0.0",
   "description": "A Zod-based form data validation library",
   "license": "MIT",
   "keywords": [

@@ -107,7 +107,9 @@ describe("flattenZodFormSchema", () => {
       "name",
     ].sort());
 
+    // @ts-expect-error - isOptional is not a method on $ZodType
     expect(flattened.shape.age.isOptional()).toBe(true);
+    // @ts-expect-error - isOptional is not a method on $ZodType
     expect(flattened.shape["address.city"].isOptional()).toBe(true);
   });
 
