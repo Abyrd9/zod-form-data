@@ -228,4 +228,63 @@ describe("parseZodFormData", () => {
       },
     });
   });
+
+  test("handles file inputs", () => {
+    const schema = z.object({
+      document: z.file(),
+      images: z.array(z.file()),
+    });
+
+    const formData = new FormData();
+    const file1 = new File(["content"], "document.pdf", { type: "application/pdf" });
+    const file2 = new File(["image1"], "image1.jpg", { type: "image/jpeg" });
+    const file3 = new File(["image2"], "image2.jpg", { type: "image/jpeg" });
+
+    formData.append("document", file1);
+    formData.append("images.0", file2);
+    formData.append("images.1", file3);
+
+    const result = parseZodFormData(formData, { schema });
+    expect(result).toEqual({
+      success: true,
+      data: {
+        document: file1,
+        images: [file2, file3],
+      },
+    });
+  });
+
+  test("handles optional file inputs", () => {
+    const schema = z.object({
+      document: z.file().optional(),
+      images: z.array(z.file()).optional(),
+    });
+
+    const formData = new FormData();
+    const result = parseZodFormData(formData, { schema });
+    expect(result).toEqual({
+      success: true,
+      data: {},
+    });
+  });
+
+  test("handles file validation errors", () => {
+    const schema = z.object({
+      document: z.file().max(1024 * 1024, "File size must be less than 1MB"),
+    });
+
+    const formData = new FormData();
+    const largeFile = new File(["x".repeat(2 * 1024 * 1024)], "large.pdf", {
+      type: "application/pdf",
+    });
+    formData.append("document", largeFile);
+
+    const result = parseZodFormData(formData, { schema });
+    expect(result).toEqual({
+      success: false,
+      errors: {
+        document: "File size must be less than 1MB",
+      },
+    });
+  });
 });

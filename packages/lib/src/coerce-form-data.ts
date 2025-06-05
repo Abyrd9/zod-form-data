@@ -34,7 +34,6 @@ export function coerceFormData<Schema extends z.ZodType>(
     case "string":
     case "literal":
     case "enum":
-    case "enum":
       schema = z.any()
         .overwrite((value) => z.coerce.string().parse(value))
         .pipe(type);
@@ -75,6 +74,11 @@ export function coerceFormData<Schema extends z.ZodType>(
     case "nullable":
     case "optional":
       schema = z.preprocess((val) => (val === "" ? null : val), type);
+      break;
+    case "file":
+      schema = z.any()
+        .overwrite((value) => value instanceof File ? value : new File([value], value.name))
+        .pipe(type);
       break;
     default:
       console.error(`Zod type not handled in coerceFormData: ${schema.def.type}`);
