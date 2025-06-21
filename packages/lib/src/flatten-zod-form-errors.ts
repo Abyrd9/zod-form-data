@@ -1,9 +1,8 @@
-import type { z } from "zod/v4";
-import type { ZodFormSchema } from ".";
+import type { NestedFieldErrors, ZodFormSchema } from ".";
 import type { DeepPartial } from "./deep-partial";
 
 export function flattenZodFormErrors<T extends ZodFormSchema>(
-  errors?: DeepPartial<z.infer<T>> | null
+  errors?: DeepPartial<NestedFieldErrors<T>> | null
 ) {
   if (!errors) return new Map<string, string>();
 

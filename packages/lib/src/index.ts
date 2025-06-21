@@ -15,107 +15,118 @@ export type FieldProps<T> = {
   error: string | null;
 };
 
-export type NestedFields<T extends z.ZodTypeAny> =
-  T extends z.ZodObject<infer Shape>
-    ? { [K in keyof Shape]: NestedFields<Shape[K] & z.ZodTypeAny> }
-    : T extends z.ZodRecord<any, infer Value>
-      ? Record<string, NestedFields<Value & z.ZodTypeAny>>
-      : T extends z.ZodMap<infer Key, infer Value>
-        ? Map<z.infer<Key>, NestedFields<Value & z.ZodTypeAny>>
-        : T extends z.ZodArray<infer Item>
-          ? NestedFields<Item & z.ZodTypeAny>[]
-          : T extends z.ZodSet<infer Item>
-            ? Set<NestedFields<Item & z.ZodTypeAny>>
-            : T extends z.ZodTuple<infer Items>
-              ? { [K in keyof Items]: NestedFields<Items[K] & z.ZodTypeAny> }
-              : FieldProps<z.infer<T>>;
+export type NestedFields<T extends z.ZodTypeAny> = T extends z.ZodObject<
+  infer Shape
+>
+  ? { [K in keyof Shape]: NestedFields<Shape[K] & z.ZodTypeAny> }
+  : T extends z.ZodRecord<any, infer Value>
+  ? Record<string, NestedFields<Value & z.ZodTypeAny>>
+  : T extends z.ZodMap<infer Key, infer Value>
+  ? Map<z.infer<Key>, NestedFields<Value & z.ZodTypeAny>>
+  : T extends z.ZodArray<infer Item>
+  ? NestedFields<Item & z.ZodTypeAny>[]
+  : T extends z.ZodSet<infer Item>
+  ? Set<NestedFields<Item & z.ZodTypeAny>>
+  : T extends z.ZodTuple<infer Items>
+  ? { [K in keyof Items]: NestedFields<Items[K] & z.ZodTypeAny> }
+  : FieldProps<z.infer<T>>;
 
-export type NestedFieldErrors<T extends z.ZodTypeAny> =
-  T extends z.ZodObject<infer Shape>
-    ? { [K in keyof Shape]: NestedFieldErrors<Shape[K] & z.ZodTypeAny> }
-    : T extends z.ZodRecord<any, infer Value>
-      ? Record<string, NestedFieldErrors<Value & z.ZodTypeAny>>
-      : T extends z.ZodMap<infer Key, infer Value>
-        ? Map<z.infer<Key>, NestedFieldErrors<Value & z.ZodTypeAny>>
-        : T extends z.ZodArray<infer Item>
-          ? NestedFieldErrors<Item & z.ZodTypeAny>[]
-          : T extends z.ZodSet<infer Item>
-            ? Set<NestedFieldErrors<Item & z.ZodTypeAny>>
-            : T extends z.ZodTuple<infer Items>
-              ? { [K in keyof Items]: NestedFieldErrors<Items[K] & z.ZodTypeAny> }
-              : string;
+export type NestedFieldErrors<T extends z.ZodTypeAny> = T extends z.ZodObject<
+  infer Shape
+>
+  ? { [K in keyof Shape]: NestedFieldErrors<Shape[K] & z.ZodTypeAny> }
+  : T extends z.ZodRecord<any, infer Value>
+  ? Record<string, NestedFieldErrors<Value & z.ZodTypeAny>>
+  : T extends z.ZodMap<infer Key, infer Value>
+  ? Map<z.infer<Key>, NestedFieldErrors<Value & z.ZodTypeAny>>
+  : T extends z.ZodArray<infer Item>
+  ? NestedFieldErrors<Item & z.ZodTypeAny>[]
+  : T extends z.ZodSet<infer Item>
+  ? Set<NestedFieldErrors<Item & z.ZodTypeAny>>
+  : T extends z.ZodTuple<infer Items>
+  ? { [K in keyof Items]: NestedFieldErrors<Items[K] & z.ZodTypeAny> }
+  : string;
 
 type TupleKeys<T extends any[]> = Exclude<keyof T, keyof any[]>;
-export type ZodPaths<T extends z.ZodTypeAny> =
-  T extends z.ZodObject<infer Shape>
-    ? {
-        [K in keyof Shape]:
-          Shape[K] extends z.ZodArray<infer Item>
-            ? Item extends z.ZodObject<infer NestedShape>
-              ? `${K & string}.#` | { [N in keyof NestedShape]: `${K & string}.#.${N & string}` | `${K & string}.#.${ZodPaths<NestedShape[N] & z.ZodTypeAny>}` }[keyof NestedShape]
-              : `${K & string}.#`
-            : Shape[K] extends z.ZodTuple<infer Items>
-              ? { [I in TupleKeys<Items & z.ZodTypeAny[]>]:
-                    Items[I] extends z.ZodObject<any>
-                      ? `${K & string}.${I & string}` | `${K & string}.${I & string}.${ZodPaths<Items[I] & z.ZodTypeAny>}`
-                      : `${K & string}.${I & string}`
-                }[TupleKeys<Items & z.ZodTypeAny[]>]
-            : Shape[K] extends z.ZodObject<any>
-              ? `${K & string}` | `${K & string}.${ZodPaths<Shape[K] & z.ZodTypeAny>}`
-            : K & string
-      }[keyof Shape]
-    : never;
+export type ZodPaths<T extends z.ZodTypeAny> = T extends z.ZodObject<
+  infer Shape
+>
+  ? {
+      [K in keyof Shape]: Shape[K] extends z.ZodArray<infer Item>
+        ? Item extends z.ZodObject<infer NestedShape>
+          ?
+              | `${K & string}.#`
+              | {
+                  [N in keyof NestedShape]:
+                    | `${K & string}.#.${N & string}`
+                    | `${K & string}.#.${ZodPaths<
+                        NestedShape[N] & z.ZodTypeAny
+                      >}`;
+                }[keyof NestedShape]
+          : `${K & string}.#`
+        : Shape[K] extends z.ZodTuple<infer Items>
+        ? {
+            [I in TupleKeys<
+              Items & z.ZodTypeAny[]
+            >]: Items[I] extends z.ZodObject<any>
+              ?
+                  | `${K & string}.${I & string}`
+                  | `${K & string}.${I & string}.${ZodPaths<
+                      Items[I] & z.ZodTypeAny
+                    >}`
+              : `${K & string}.${I & string}`;
+          }[TupleKeys<Items & z.ZodTypeAny[]>]
+        : Shape[K] extends z.ZodObject<any>
+        ? `${K & string}` | `${K & string}.${ZodPaths<Shape[K] & z.ZodTypeAny>}`
+        : K & string;
+    }[keyof Shape]
+  : never;
 
 export type ArrayElementType<
   Schema extends z.ZodTypeAny,
   Path extends string
-> =
-  Path extends `${infer Key}.#.${infer Rest}`
-    ? Schema extends z.ZodObject<infer Shape>
-      ? Key extends keyof Shape
-        ? Shape[Key] extends z.ZodArray<infer Item>
-          ? ArrayElementType<Item & z.ZodTypeAny, Rest>
-          : never
+> = Path extends `${infer Key}.#.${infer Rest}`
+  ? Schema extends z.ZodObject<infer Shape>
+    ? Key extends keyof Shape
+      ? Shape[Key] extends z.ZodArray<infer Item>
+        ? ArrayElementType<Item & z.ZodTypeAny, Rest>
         : never
       : never
-    : Path extends `${infer Key}.${infer Rest}`
-      ? Schema extends z.ZodObject<infer Shape>
-        ? Key extends keyof Shape
-          ? ArrayElementType<Shape[Key] & z.ZodTypeAny, Rest>
-          : never
-        : never
-      : Schema extends z.ZodObject<infer Shape>
-        ? Path extends keyof Shape
-          ? Shape[Path] extends z.ZodArray<infer Item>
-            ? z.infer<Item>
-            : never
-          : never
+    : never
+  : Path extends `${infer Key}.${infer Rest}`
+  ? Schema extends z.ZodObject<infer Shape>
+    ? Key extends keyof Shape
+      ? ArrayElementType<Shape[Key] & z.ZodTypeAny, Rest>
+      : never
+    : never
+  : Schema extends z.ZodObject<infer Shape>
+  ? Path extends keyof Shape
+    ? Shape[Path] extends z.ZodArray<infer Item>
+      ? z.infer<Item>
+      : never
+    : never
+  : never;
+
+export type ArrayPaths<
+  T extends z.ZodTypeAny,
+  Prefix extends string = ""
+> = T extends z.ZodObject<infer Shape>
+  ? {
+      [K in keyof Shape]: Shape[K] extends z.ZodArray<infer Item>
+        ?
+            | `${Prefix}${K & string}`
+            | ArrayPaths<Item & z.ZodTypeAny, `${Prefix}${K & string}.#.`>
+        : Shape[K] extends z.ZodObject<any>
+        ? ArrayPaths<Shape[K], `${Prefix}${K & string}.`>
         : never;
-
-export type ArrayPaths<T extends z.ZodTypeAny, Prefix extends string = ""> =
-  T extends z.ZodObject<infer Shape>
-    ? {
-        [K in keyof Shape]:
-          Shape[K] extends z.ZodArray<infer Item>
-            ? | `${Prefix}${K & string}`
-              | ArrayPaths<Item & z.ZodTypeAny, `${Prefix}${K & string}.#.`>
-            : Shape[K] extends z.ZodObject<any>
-              ? ArrayPaths<Shape[K], `${Prefix}${K & string}.`>
-              : never
-      }[keyof Shape]
-    : never;
-
-    const schema = z.object({
-      users: z.array(z.object({
-        name: z.string(),
-        posts: z.array(z.object({ title: z.string() }))
-      }))
-    });
+    }[keyof Shape]
+  : never;
 
 // A form is a flattened collection of fields
 // - sub fields should be . delimited
 // - array fields should be [#] delimited
 // When we pass in the schema, we should be able to determine what the form field names should be.
+
 
 export const useZodForm = <Schema extends ZodFormSchema>({
   schema,
@@ -128,7 +139,8 @@ export const useZodForm = <Schema extends ZodFormSchema>({
 }) => {
   const [flattenedData, setFlattenedData] = useState(() => {
     const zodDefaults = extractZodDefaults(schema);
-    const initial = defaultValues ?? zodDefaults ?? {} as DeepPartial<z.infer<Schema>>;
+    const initial =
+      defaultValues ?? zodDefaults ?? ({} as DeepPartial<z.infer<Schema>>);
     return flattenZodFormData(schema, initial);
   });
 
@@ -163,11 +175,10 @@ export const useZodForm = <Schema extends ZodFormSchema>({
               key,
             ]);
           }
-  
+
           return objectFields as NestedFields<T>;
         }
       }
-
 
       if (field instanceof z.ZodArray) {
         const arrayPath = path.join(".") as ZodPaths<Schema>;

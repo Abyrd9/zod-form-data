@@ -1,6 +1,4 @@
-import {
-  z,
-} from "zod/v4";
+import { z } from "zod/v4";
 import type { ZodFormSchema } from ".";
 import type { DeepPartial } from "./deep-partial";
 import { unflattenZodFormData } from "./unflatten-zod-form-data";
@@ -17,11 +15,11 @@ export function extractZodDefaults<T extends ZodFormSchema>(
     if (currentSubSchema instanceof z.ZodObject) {
       const shape = currentSubSchema.shape;
       for (const [key, value] of Object.entries(shape)) {
-          const newPrefix = prefix ? `${prefix}.${key}` : key;
-          extract(value as z.ZodType, newPrefix);
-        }
+        const newPrefix = prefix ? `${prefix}.${key}` : key;
+        extract(value as z.ZodType, newPrefix);
+      }
 
-        return;
+      return;
     }
 
     if (currentSubSchema instanceof z.ZodArray) {
@@ -31,7 +29,7 @@ export function extractZodDefaults<T extends ZodFormSchema>(
     }
 
     if (currentSubSchema instanceof z.ZodDefault) {
-      const defaultValue = currentSubSchema.def.defaultValue
+      const defaultValue = currentSubSchema.def.defaultValue;
       if (defaultValue !== undefined) {
         defaults[prefix] = defaultValue;
       }
@@ -43,7 +41,7 @@ export function extractZodDefaults<T extends ZodFormSchema>(
       return;
     }
 
-    console.warn("unhandled zod type", currentSubSchema)
+    console.warn("unhandled zod type", currentSubSchema);
   }
 
   extract(schema);

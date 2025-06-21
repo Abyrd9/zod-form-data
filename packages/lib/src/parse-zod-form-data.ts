@@ -55,7 +55,7 @@ export const parseZodFormData = <T extends ZodFormSchema>(
         // For numbers, first try to coerce to number
         if (matchingSchema instanceof z.ZodNumber) {
           const num = Number(formDataValue);
-          console.log("NUM", num)
+          console.log("NUM", num);
           if (!isNaN(num)) {
             result[key] = num;
           } else {

@@ -11,7 +11,6 @@ export function flattenZodFormSchema<T extends ZodFormSchema>(
   function flatten(subSchema: $ZodType, prefix = "") {
     let currentSubSchema = subSchema;
 
-
     if (currentSubSchema instanceof z.ZodObject) {
       for (const [key, value] of Object.entries(currentSubSchema.shape)) {
         const newPrefix = prefix ? `${prefix}.${key}` : key;
@@ -25,7 +24,10 @@ export function flattenZodFormSchema<T extends ZodFormSchema>(
       return;
     }
 
-    if (currentSubSchema instanceof z.ZodUnion || currentSubSchema instanceof z.ZodDiscriminatedUnion) {
+    if (
+      currentSubSchema instanceof z.ZodUnion ||
+      currentSubSchema instanceof z.ZodDiscriminatedUnion
+    ) {
       for (const option of currentSubSchema.options) {
         flatten(option as z.ZodType, prefix);
       }
