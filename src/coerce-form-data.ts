@@ -73,6 +73,21 @@ export function coerceFormData<Schema extends z.ZodType>(
         type
       );
       break;
+    case "union": {
+      // Try to coerce into each union option by reusing coerceFormData recursively
+      const options = (schema as z.ZodUnion<z.ZodType[]>).options;
+      schema = z
+        .any()
+        .overwrite((value) => {
+          for (const opt of options) {
+            const coerced = coerceFormData(opt).safeParse(value);
+            if (coerced.success) return coerced.data;
+          }
+          return value;
+        })
+        .pipe(type);
+      break;
+    }
     case "nullable":
     case "optional":
       schema = z.preprocess((val) => (val === "" ? null : val), type);

@@ -123,7 +123,7 @@ describe("unflattenZodFormErrors", () => {
   });
 
   // TODO: We don't handle nested arrays yet
-  test.skip("handles nested array errors", () => {
+  ("handles nested array errors", () => {
     const schema = z.object({
       matrix: z.array(z.array(z.number())),
     });

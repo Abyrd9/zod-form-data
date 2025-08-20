@@ -1,56 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { z } from "zod/v4";
 import type { DeepPartial } from "./deep-partial";
-import { extractZodDefaults } from "./extract-zod-defaults";
 import { flattenZodFormData } from "./flatten-zod-form-data";
 import { flattenZodFormErrors } from "./flatten-zod-form-errors";
-import { unflattenZodFormData } from "./unflatten-zod-form-data";
+import type { NestedFieldErrors } from "./flatten-zod-form-errors";
+import { getFieldProps, NestedFields } from "./get-field-props";
+import { $ZodType } from "zod/v4/core";
 
-export type ZodFormSchema = z.ZodTypeAny;
-
-export type FieldProps<T> = {
-  name: string;
-  value: T;
-  onChange: (payload: T) => void;
-  error: string | null;
-};
-
-export type NestedFields<T extends z.ZodTypeAny> = T extends z.ZodObject<
-  infer Shape
->
-  ? { [K in keyof Shape]: NestedFields<Shape[K] & z.ZodTypeAny> }
-  : T extends z.ZodRecord<any, infer Value>
-  ? Record<string, NestedFields<Value & z.ZodTypeAny>>
-  : T extends z.ZodMap<infer Key, infer Value>
-  ? Map<z.infer<Key>, NestedFields<Value & z.ZodTypeAny>>
-  : T extends z.ZodArray<infer Item>
-  ? NestedFields<Item & z.ZodTypeAny>[]
-  : T extends z.ZodSet<infer Item>
-  ? Set<NestedFields<Item & z.ZodTypeAny>>
-  : T extends z.ZodTuple<infer Items>
-  ? { [K in keyof Items]: NestedFields<Items[K] & z.ZodTypeAny> }
-  : FieldProps<z.infer<T>>;
-
-export type NestedFieldErrors<T extends z.ZodTypeAny> = T extends z.ZodObject<
-  infer Shape
->
-  ? { [K in keyof Shape]: NestedFieldErrors<Shape[K] & z.ZodTypeAny> }
-  : T extends z.ZodRecord<any, infer Value>
-  ? Record<string, NestedFieldErrors<Value & z.ZodTypeAny>>
-  : T extends z.ZodMap<infer Key, infer Value>
-  ? Map<z.infer<Key>, NestedFieldErrors<Value & z.ZodTypeAny>>
-  : T extends z.ZodArray<infer Item>
-  ? NestedFieldErrors<Item & z.ZodTypeAny>[]
-  : T extends z.ZodSet<infer Item>
-  ? Set<NestedFieldErrors<Item & z.ZodTypeAny>>
-  : T extends z.ZodTuple<infer Items>
-  ? { [K in keyof Items]: NestedFieldErrors<Items[K] & z.ZodTypeAny> }
-  : string;
+// NestedFieldErrors type is defined in flatten-zod-form-errors to avoid divergence
 
 type TupleKeys<T extends any[]> = Exclude<keyof T, keyof any[]>;
-export type ZodPaths<T extends z.ZodTypeAny> = T extends z.ZodObject<
-  infer Shape
->
+export type ZodPaths<T extends $ZodType> = T extends z.ZodObject<infer Shape>
   ? {
       [K in keyof Shape]: Shape[K] extends z.ZodArray<infer Item>
         ? Item extends z.ZodObject<infer NestedShape>
@@ -82,13 +42,23 @@ export type ZodPaths<T extends z.ZodTypeAny> = T extends z.ZodObject<
     }[keyof Shape]
   : never;
 
+// Unwrap optional/default/nullable wrappers to reach the underlying schema
+// Works with zod/v4 classes
+type UnwrapModifiers<T> = T extends z.ZodOptional<infer U>
+  ? UnwrapModifiers<U>
+  : T extends z.ZodDefault<infer U>
+  ? UnwrapModifiers<U>
+  : T extends z.ZodNullable<infer U>
+  ? UnwrapModifiers<U>
+  : T;
+
 export type ArrayElementType<
   Schema extends z.ZodTypeAny,
   Path extends string
 > = Path extends `${infer Key}.#.${infer Rest}`
   ? Schema extends z.ZodObject<infer Shape>
     ? Key extends keyof Shape
-      ? Shape[Key] extends z.ZodArray<infer Item>
+      ? UnwrapModifiers<Shape[Key]> extends z.ZodArray<infer Item>
         ? ArrayElementType<Item & z.ZodTypeAny, Rest>
         : never
       : never
@@ -96,12 +66,12 @@ export type ArrayElementType<
   : Path extends `${infer Key}.${infer Rest}`
   ? Schema extends z.ZodObject<infer Shape>
     ? Key extends keyof Shape
-      ? ArrayElementType<Shape[Key] & z.ZodTypeAny, Rest>
+      ? ArrayElementType<UnwrapModifiers<Shape[Key]> & z.ZodTypeAny, Rest>
       : never
     : never
   : Schema extends z.ZodObject<infer Shape>
   ? Path extends keyof Shape
-    ? Shape[Path] extends z.ZodArray<infer Item>
+    ? UnwrapModifiers<Shape[Path]> extends z.ZodArray<infer Item>
       ? z.infer<Item>
       : never
     : never
@@ -112,12 +82,12 @@ export type ArrayPaths<
   Prefix extends string = ""
 > = T extends z.ZodObject<infer Shape>
   ? {
-      [K in keyof Shape]: Shape[K] extends z.ZodArray<infer Item>
+      [K in keyof Shape]: UnwrapModifiers<Shape[K]> extends z.ZodArray<infer Item>
         ?
             | `${Prefix}${K & string}`
             | ArrayPaths<Item & z.ZodTypeAny, `${Prefix}${K & string}.#.`>
-        : Shape[K] extends z.ZodObject<any>
-        ? ArrayPaths<Shape[K], `${Prefix}${K & string}.`>
+        : UnwrapModifiers<Shape[K]> extends z.ZodObject<any>
+        ? ArrayPaths<UnwrapModifiers<Shape[K]>, `${Prefix}${K & string}.`>
         : never;
     }[keyof Shape]
   : never;
@@ -126,9 +96,7 @@ export type ArrayPaths<
 // - sub fields should be . delimited
 // - array fields should be [#] delimited
 // When we pass in the schema, we should be able to determine what the form field names should be.
-
-
-export const useZodForm = <Schema extends ZodFormSchema>({
+export const useZodForm = <Schema extends $ZodType>({
   schema,
   defaultValues,
   errors: passedInErrors,
@@ -138,9 +106,7 @@ export const useZodForm = <Schema extends ZodFormSchema>({
   errors?: DeepPartial<NestedFieldErrors<Schema>> | null;
 }) => {
   const [flattenedData, setFlattenedData] = useState(() => {
-    const zodDefaults = extractZodDefaults(schema);
-    const initial =
-      defaultValues ?? zodDefaults ?? ({} as DeepPartial<z.infer<Schema>>);
+    const initial = defaultValues ?? ({} as DeepPartial<z.infer<Schema>>);
     return flattenZodFormData(schema, initial);
   });
 
@@ -162,62 +128,22 @@ export const useZodForm = <Schema extends ZodFormSchema>({
   }, [passedInErrors, setFieldErrors]);
 
   const fields = useMemo((): NestedFields<Schema> => {
-    const getFieldProps = <T extends z.ZodTypeAny>(
-      field: T,
-      path: string[] = []
-    ): NestedFields<T> => {
-      if (field instanceof z.ZodType) {
-        if (field instanceof z.ZodObject) {
-          const objectFields: Record<string, unknown> = {};
-          for (const [key, subField] of Object.entries(field.shape)) {
-            objectFields[key] = getFieldProps(subField as z.ZodTypeAny, [
-              ...path,
-              key,
-            ]);
-          }
-
-          return objectFields as NestedFields<T>;
-        }
-      }
-
-      if (field instanceof z.ZodArray) {
-        const arrayPath = path.join(".") as ZodPaths<Schema>;
-
-        const nested = unflattenZodFormData<typeof field>(
-          flattenedData,
-          arrayPath
-        );
-
-        return (
-          (nested?.map((_: unknown, index: number) =>
-            getFieldProps(
-              (field as unknown as z.ZodArray<z.ZodTypeAny>).element,
-              [...path, index.toString()]
-            )
-          ) as NestedFields<T>) ?? []
-        );
-      }
-
-      const fieldPath = path.join(".") as ZodPaths<Schema>;
-      const value = flattenedData[fieldPath] as z.infer<T>;
-
-      return {
-        name: fieldPath,
-        value,
-        onChange: (payload: z.infer<T>) => {
-          setFlattenedData((prev) => ({ ...prev, [fieldPath]: payload }));
-        },
-        error: internalErrors.get(fieldPath) ?? null,
-      } as unknown as NestedFields<T>;
-    };
-
-    return getFieldProps(schema) as NestedFields<Schema>;
+    return getFieldProps(
+      schema,
+      [],
+      flattenedData as Record<string, unknown>,
+      (updater) =>
+        setFlattenedData(
+          (prev) => updater(prev as Record<string, unknown>) as any
+        ),
+      internalErrors
+    ) as NestedFields<Schema>;
   }, [schema, flattenedData, internalErrors]);
 
   const getFieldArrayHelpers = useCallback(
-    <P extends ArrayPaths<Schema>>(path: P) => {
+    <P extends ArrayPaths<Schema & z.ZodTypeAny>>(path: P) => {
       return {
-        add: (value: ArrayElementType<Schema, P>) => {
+        add: (value: ArrayElementType<Schema & z.ZodTypeAny, P>) => {
           setFlattenedData((prev) => {
             const newData = { ...prev };
             const currentArray = Object.keys(newData)
@@ -284,12 +210,14 @@ export const useZodForm = <Schema extends ZodFormSchema>({
     setFieldErrors,
   } satisfies {
     fields: NestedFields<Schema>;
-    getFieldArrayHelpers: <P extends ArrayPaths<Schema>>(
+    getFieldArrayHelpers: <P extends ArrayPaths<Schema & z.ZodTypeAny>>(
       path: P
     ) => {
-      add: (value: ArrayElementType<Schema, P>) => void;
+      add: (value: ArrayElementType<Schema & z.ZodTypeAny, P>) => void;
       remove: (index: number) => void;
     };
     setFieldErrors: (errors: DeepPartial<NestedFieldErrors<Schema>>) => void;
   };
 };
+
+export { getFieldProps };

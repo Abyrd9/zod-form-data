@@ -1,7 +1,8 @@
-import type { NestedFieldErrors, ZodFormSchema } from ".";
+import type { NestedFieldErrors } from "./flatten-zod-form-errors";
 import type { DeepPartial } from "./deep-partial";
+import type { $ZodType } from "zod/v4/core";
 
-export function unflattenZodFormErrors<T extends ZodFormSchema>(
+export function unflattenZodFormErrors<T extends $ZodType>(
   errors: Record<string, string>,
   root?: string
 ): DeepPartial<NestedFieldErrors<T>> {

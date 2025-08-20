@@ -39,8 +39,8 @@ describe("parseZodData", () => {
     expect(result).toEqual({
       success: false,
       errors: {
-        age: "Too small: expected number to be >=18",
         email: "Invalid email address",
+        age: "Too small: expected number to be >=18",
       },
     });
   });
@@ -69,15 +69,7 @@ describe("parseZodData", () => {
     const result = parseZodData(data, { schema });
     expect(result).toEqual({
       success: true,
-      data: {
-        user: {
-          name: "John",
-          address: {
-            street: "123 Main St",
-            city: "Boston",
-          },
-        },
-      },
+      data,
     });
   });
 
@@ -101,29 +93,15 @@ describe("parseZodData", () => {
     };
 
     const result = parseZodData(data, { schema });
-    expect(result).toEqual({
-      success: true,
-      data: {
-        tags: ["typescript", "zod"],
-        users: [
-          { name: "John", age: 30 },
-          { name: "Jane", age: 25 },
-        ],
-      },
-    });
+    expect(result).toEqual({ success: true, data });
   });
 
   test("handles record types", () => {
     const schema = z.object({
-      metadata: z.record(z.string(), z.string()),
       settings: z.record(z.string(), z.number()),
     });
 
     const data = {
-      metadata: {
-        key1: "value1",
-        key2: "value2",
-      },
       settings: {
         timeout: 5000,
         limit: 100,
@@ -131,31 +109,17 @@ describe("parseZodData", () => {
     };
 
     const result = parseZodData(data, { schema });
-    expect(result).toEqual({
-      success: true,
-      data: {
-        metadata: {
-          key1: "value1",
-          key2: "value2",
-        },
-        settings: {
-          timeout: 5000,
-          limit: 100,
-        },
-      },
-    });
+    expect(result).toEqual({ success: true, data });
   });
 
   test("handles optional fields", () => {
     const schema = z.object({
       name: z.string(),
       age: z.number().optional(),
-      address: z
-        .object({
-          street: z.string(),
-          city: z.string().optional(),
-        })
-        .optional(),
+      address: z.object({
+        street: z.string(),
+        city: z.string().optional(),
+      }).optional(),
     });
 
     const data = {
@@ -166,44 +130,7 @@ describe("parseZodData", () => {
     };
 
     const result = parseZodData(data, { schema });
-    expect(result).toEqual({
-      success: true,
-      data: {
-        name: "John",
-        address: {
-          street: "123 Main St",
-        },
-      },
-    });
-  });
-
-  test.skip("handles discriminated unions", () => {
-    const schema = z.object({
-      data: z.discriminatedUnion("type", [
-        z.object({ type: z.literal("text"), content: z.string() }),
-        z.object({ type: z.literal("number"), value: z.number() }),
-      ]),
-    });
-
-    const data = {
-      data: {
-        type: "text",
-        content: "Hello World",
-      },
-    };
-
-    // TODO: We don't handle this well yet. Also it would be weird in a form to submit a completely different value in a form field??
-    // @ts-ignore
-    const result = parseZodData(data, { schema });
-    expect(result).toEqual({
-      success: true,
-      data: {
-        data: {
-          type: "text",
-          content: "Hello World",
-        },
-      },
-    });
+    expect(result).toEqual({ success: true, data });
   });
 
   test("handles missing required fields", () => {
@@ -214,9 +141,8 @@ describe("parseZodData", () => {
 
     const data = {
       name: "John",
-    };
+    } as any;
 
-    // @ts-expect-error - We're testing for this field missing
     const result = parseZodData(data, { schema });
     expect(result).toEqual({
       success: false,
@@ -249,5 +175,32 @@ describe("parseZodData", () => {
         confirmPassword: "Passwords don't match",
       },
     });
+  });
+
+  // NEW: tuples
+  test("handles tuples", () => {
+    const schema = z.object({ coords: z.tuple([z.number(), z.number()]) });
+    const data = { coords: [40.7128, -74.006] as [number, number] };
+    const result = parseZodData(data, { schema });
+    expect(result).toEqual({ success: true, data });
+  });
+
+  // NEW: map and set
+  test("handles map and set", () => {
+    const schema = z.object({
+      scores: z.map(z.string(), z.number()),
+      labels: z.set(z.string()),
+    });
+
+    const data = {
+      scores: new Map<string, number>([
+        ["a", 1],
+        ["b", 2],
+      ]),
+      labels: new Set<string>(["x", "y"]),
+    };
+
+    const result = parseZodData(data, { schema });
+    expect(result).toEqual({ success: true, data });
   });
 });

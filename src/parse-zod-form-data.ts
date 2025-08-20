@@ -1,11 +1,12 @@
 import { ZodError, z } from "zod/v4";
-import type { NestedFieldErrors, ZodFormSchema } from ".";
+import type { NestedFieldErrors } from "./flatten-zod-form-errors";
 import { coerceFormData } from "./coerce-form-data";
 import type { DeepPartial } from "./deep-partial";
 import { flattenZodFormSchema } from "./flatten-zod-form-schema";
 import { unflattenZodFormData } from "./unflatten-zod-form-data";
+import type { $ZodType } from "zod/v4/core";
 
-type ParseResult<T extends ZodFormSchema> =
+type ParseResult<T extends $ZodType> =
   | { success: true; data: z.infer<T> }
   | {
       success: false;
@@ -25,7 +26,7 @@ function matchWildcardString(pattern: string, key: string): boolean {
   });
 }
 
-export const parseZodFormData = <T extends ZodFormSchema>(
+export const parseZodFormData = <T extends $ZodType>(
   form: FormData,
   {
     schema,
@@ -55,7 +56,6 @@ export const parseZodFormData = <T extends ZodFormSchema>(
         // For numbers, first try to coerce to number
         if (matchingSchema instanceof z.ZodNumber) {
           const num = Number(formDataValue);
-          console.log("NUM", num);
           if (!isNaN(num)) {
             result[key] = num;
           } else {
@@ -71,12 +71,16 @@ export const parseZodFormData = <T extends ZodFormSchema>(
         }
       } catch (error) {
         if (error instanceof ZodError) {
+          let added = false;
           for (const zodError of error.issues) {
             const path = zodError.path.join(".");
             if (path) {
-              // Only add errors with non-empty paths
               errors[path] = zodError.message;
+              added = true;
             }
+          }
+          if (!added) {
+            errors[key] = error.issues[0]?.message ?? "Invalid value";
           }
         } else {
           errors[key] = "An unexpected error occurred during coercion";
@@ -91,6 +95,7 @@ export const parseZodFormData = <T extends ZodFormSchema>(
   // Second pass: Validate the coerced data
   try {
     const unflattenedData = unflattenZodFormData(result);
+    // @ts-expect-error - This is a schema
     const validatedData = schema.safeParse(unflattenedData);
 
     if (!validatedData.success) {
@@ -127,7 +132,7 @@ export const parseZodFormData = <T extends ZodFormSchema>(
   return { success: false, errors: {} };
 };
 
-export const parseZodData = <T extends ZodFormSchema>(
+export const parseZodData = <T extends $ZodType>(
   data: z.infer<T>,
   {
     schema,
@@ -137,6 +142,7 @@ export const parseZodData = <T extends ZodFormSchema>(
 ): ParseResult<T> => {
   try {
     // Use safeParse instead of parse to handle errors more gracefully
+    // @ts-expect-error - This is a schema
     const validatedData = schema.safeParse(data);
 
     if (!validatedData.success) {

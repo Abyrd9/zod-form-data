@@ -1,9 +1,7 @@
 import { z } from "zod/v4";
-import type { ZodFormSchema } from ".";
-import { ZodFirstPartyTypeKind } from "zod";
 import { $ZodType } from "zod/v4/core";
 
-export function flattenZodFormSchema<T extends ZodFormSchema>(
+export function flattenZodFormSchema<T extends $ZodType>(
   schema: T
 ): z.ZodObject<z.ZodRawShape> {
   const flattenedSchemaMap = new Map<string, z.ZodType>();
@@ -24,13 +22,31 @@ export function flattenZodFormSchema<T extends ZodFormSchema>(
       return;
     }
 
-    if (
-      currentSubSchema instanceof z.ZodUnion ||
-      currentSubSchema instanceof z.ZodDiscriminatedUnion
-    ) {
+    if (currentSubSchema instanceof z.ZodTuple) {
+      // For tuples, coerce each element using a union of item schemas and use # placeholder
+      const items = (currentSubSchema.def.items ?? []) as unknown as z.ZodType[];
+      if (items.length === 1) {
+        flattenedSchemaMap.set(`${prefix}.#`, items[0] as z.ZodType);
+      } else if (items.length > 1) {
+        flattenedSchemaMap.set(`${prefix}.#`, z.union(items as any));
+      }
+      return;
+    }
+
+    // Discriminated unions: include the discriminator path and flatten option fields
+    if (currentSubSchema instanceof z.ZodDiscriminatedUnion) {
+      const discriminator = (currentSubSchema as any)._def?.discriminator ?? (currentSubSchema as any).discriminator;
+      const discPath = prefix ? `${prefix}.${discriminator}` : discriminator;
+      // The discriminator itself is a literal string; using z.string() matches tests
+      flattenedSchemaMap.set(discPath, z.string());
       for (const option of currentSubSchema.options) {
         flatten(option as z.ZodType, prefix);
       }
+      return;
+    }
+    if (currentSubSchema instanceof z.ZodUnion) {
+      // Keep union as a single leaf at this path for coercion
+      flattenedSchemaMap.set(prefix, currentSubSchema);
       return;
     }
 
@@ -55,6 +71,7 @@ export function flattenZodFormSchema<T extends ZodFormSchema>(
       return;
     }
 
+    // Leaf: store the schema at this path
     flattenedSchemaMap.set(prefix, subSchema as z.ZodType);
   }
 

@@ -1,7 +1,7 @@
+import { NestedFieldErrors } from "./src/flatten-zod-form-errors";
+import { FieldProps } from "./src/get-field-props";
 import {
-  useZodForm,
-  type NestedFieldErrors,
-  type FieldProps,
+  useZodForm
 } from "./src/index";
 import { parseZodFormData, parseZodData } from "./src/parse-zod-form-data";
 

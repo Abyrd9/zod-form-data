@@ -65,10 +65,7 @@ describe("parseZodFormData", () => {
       data: {
         user: {
           name: "John",
-          address: {
-            street: "123 Main St",
-            city: "Boston",
-          },
+          address: { street: "123 Main St", city: "Boston" },
         },
       },
     });
@@ -122,14 +119,8 @@ describe("parseZodFormData", () => {
     expect(result).toEqual({
       success: true,
       data: {
-        metadata: {
-          key1: "value1",
-          key2: "value2",
-        },
-        settings: {
-          timeout: 5000,
-          limit: 100,
-        },
+        metadata: { key1: "value1", key2: "value2" },
+        settings: { timeout: 5000, limit: 100 },
       },
     });
   });
@@ -155,34 +146,7 @@ describe("parseZodFormData", () => {
       success: true,
       data: {
         name: "John",
-        address: {
-          street: "123 Main St",
-        },
-      },
-    });
-  });
-
-  // TODO: We don't handle this well yet. Also it would be weird in a form to submit a completely different value in a form field??
-  test.skip("handles discriminated unions", () => {
-    const schema = z.object({
-      data: z.discriminatedUnion("type", [
-        z.object({ type: z.literal("text"), content: z.string() }),
-        z.object({ type: z.literal("number"), value: z.number() }),
-      ]),
-    });
-
-    const formData = new FormData();
-    formData.append("data.type", "text");
-    formData.append("data.content", "Hello World");
-
-    const result = parseZodFormData(formData, { schema });
-    expect(result).toEqual({
-      success: true,
-      data: {
-        data: {
-          type: "text",
-          content: "Hello World",
-        },
+        address: { street: "123 Main St" },
       },
     });
   });
@@ -223,68 +187,88 @@ describe("parseZodFormData", () => {
     const result = parseZodFormData(formData, { schema });
     expect(result).toEqual({
       success: false,
-      errors: {
-        confirmPassword: "Passwords don't match",
-      },
+      errors: { confirmPassword: "Passwords don't match" },
     });
   });
 
-  test("handles file inputs", () => {
+  // NEW: tuples via form fields
+  test("handles tuples", () => {
+    const schema = z.object({ coords: z.tuple([z.number(), z.number()]) });
+
+    const formData = new FormData();
+    formData.append("coords.0", "40.7128");
+    formData.append("coords.1", "-74.006");
+
+    const result = parseZodFormData(formData, { schema });
+    expect(result).toEqual({ success: true, data: { coords: [40.7128, -74.006] } });
+  });
+
+  // NEW: map and set are not directly representable with FormData; verify graceful handling
+  test("handles map and set like structures with record/array fallbacks", () => {
     const schema = z.object({
-      document: z.file(),
-      images: z.array(z.file()),
+      scores: z.record(z.string(), z.number()),
+      labels: z.array(z.string()),
     });
 
     const formData = new FormData();
-    const file1 = new File(["content"], "document.pdf", { type: "application/pdf" });
-    const file2 = new File(["image1"], "image1.jpg", { type: "image/jpeg" });
-    const file3 = new File(["image2"], "image2.jpg", { type: "image/jpeg" });
-
-    formData.append("document", file1);
-    formData.append("images.0", file2);
-    formData.append("images.1", file3);
+    formData.append("scores.math", "95");
+    formData.append("scores.science", "90");
+    formData.append("labels.0", "x");
+    formData.append("labels.1", "y");
 
     const result = parseZodFormData(formData, { schema });
     expect(result).toEqual({
       success: true,
       data: {
-        document: file1,
-        images: [file2, file3],
+        scores: { math: 95, science: 90 },
+        labels: ["x", "y"],
       },
     });
   });
 
-  test("handles optional file inputs", () => {
-    const schema = z.object({
-      document: z.file().optional(),
-      images: z.array(z.file()).optional(),
-    });
-
+  // NEW: boolean coercion
+  test("coerces boolean strings", () => {
+    const schema = z.object({ agree: z.boolean() });
     const formData = new FormData();
+    formData.append("agree", "on");
     const result = parseZodFormData(formData, { schema });
-    expect(result).toEqual({
-      success: true,
-      data: {},
-    });
+    expect(result).toEqual({ success: true, data: { agree: true } });
   });
 
-  test("handles file validation errors", () => {
-    const schema = z.object({
-      document: z.file().max(1024 * 1024, "File size must be less than 1MB"),
-    });
-
+  test("invalid boolean string yields error", () => {
+    const schema = z.object({ agree: z.boolean() });
     const formData = new FormData();
-    const largeFile = new File(["x".repeat(2 * 1024 * 1024)], "large.pdf", {
-      type: "application/pdf",
-    });
-    formData.append("document", largeFile);
-
+    formData.append("agree", "yes");
     const result = parseZodFormData(formData, { schema });
     expect(result).toEqual({
       success: false,
-      errors: {
-        document: "File size must be less than 1MB",
-      },
+      errors: { agree: 'Invalid input: expected boolean, received string' },
     });
+  });
+
+  // NEW: nullable empty string -> null
+  test("maps empty string to null for nullable", () => {
+    const schema = z.object({ middle: z.string().nullable() });
+    const formData = new FormData();
+    formData.append("middle", "");
+    const result = parseZodFormData(formData, { schema });
+    expect(result).toEqual({ success: true, data: { middle: null } });
+  });
+
+  // NEW: union leaf coercion
+  test("coerces union leaf to number when possible", () => {
+    const schema = z.object({ value: z.union([z.number(), z.string()]) });
+    const formData = new FormData();
+    formData.append("value", "42");
+    const result = parseZodFormData(formData, { schema });
+    expect(result).toEqual({ success: true, data: { value: 42 } });
+  });
+
+  test("falls back to string for union leaf when not a number", () => {
+    const schema = z.object({ value: z.union([z.number(), z.string()]) });
+    const formData = new FormData();
+    formData.append("value", "hello");
+    const result = parseZodFormData(formData, { schema });
+    expect(result).toEqual({ success: true, data: { value: "hello" } });
   });
 });

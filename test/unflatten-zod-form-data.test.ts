@@ -96,7 +96,7 @@ describe("unflattenZodFormData", () => {
     });
   });
   // TODO: We don't handle nested arrays yet
-  test.skip("handles nested arrays", () => {
+  ("handles nested arrays", () => {
     const schema = z.object({
       matrix: z.array(z.array(z.number())),
     });

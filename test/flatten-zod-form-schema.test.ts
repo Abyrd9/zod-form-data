@@ -60,7 +60,7 @@ describe("flattenZodFormSchema", () => {
   });
 
   // TODO: We don't handle this well yet
-  test.skip("handles union types", () => {
+  test("handles union types", () => {
     const schema = z.object({
       status: z.union([z.literal("active"), z.literal("inactive")]),
     });
@@ -87,7 +87,7 @@ describe("flattenZodFormSchema", () => {
   });
 
   // TODO: Handle passing down optional fields to the flattened field
-  test.skip("handles optional fields", () => {
+  test("handles optional fields", () => {
     const schema = z.object({
       name: z.string(),
       age: z.number().optional(),
@@ -199,7 +199,7 @@ describe("flattenZodFormSchema", () => {
   });
 
   // TODO: We don't handle this well yet
-  test.skip("handles lazy recursive schemas", () => {
+  test("handles lazy recursive schemas", () => {
     type Comment = {
       text: string;
       replies: Comment[];
@@ -241,5 +241,12 @@ describe("flattenZodFormSchema", () => {
     expect(Object.keys(flattened.shape)).toEqual(["age", "name"]);
     expect(flattened.shape.age).toBeInstanceOf(z.ZodNumber);
     expect(flattened.shape.name).toBeInstanceOf(z.ZodString);
+  });
+
+  test("flattens tuple schema into # placeholder", () => {
+    const schema = z.object({ coords: z.tuple([z.number(), z.number()]) });
+    const flattened = flattenZodFormSchema(schema);
+    expect(Object.keys(flattened.shape)).toContain("coords.#");
+    expect(flattened.shape["coords.#"]).toBeInstanceOf(z.ZodUnion);
   });
 });
