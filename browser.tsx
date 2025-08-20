@@ -93,6 +93,14 @@ function TestForm() {
     tree: Tree,
   });
 
+  const { fields, getFieldArrayHelpers, setFieldErrors } = useZodForm({
+    schema: complexSchema,
+    defaultValues: {
+      id: 'id-1',
+      createdAt: new Date(),
+    },
+  });
+
   return null;
 }
 

@@ -6,19 +6,25 @@ export function flattenZodFormSchema<T extends $ZodType>(
 ): z.ZodObject<z.ZodRawShape> {
   const flattenedSchemaMap = new Map<string, z.ZodType>();
 
-  function flatten(subSchema: $ZodType, prefix = "") {
+  function flatten(
+    subSchema: $ZodType,
+    prefix = "",
+    options?: { isOptional?: boolean; lazyDepth?: number }
+  ) {
     let currentSubSchema = subSchema;
+    const isOptional = options?.isOptional === true;
+    const lazyDepth = options?.lazyDepth ?? 0;
 
     if (currentSubSchema instanceof z.ZodObject) {
       for (const [key, value] of Object.entries(currentSubSchema.shape)) {
         const newPrefix = prefix ? `${prefix}.${key}` : key;
-        flatten(value as z.ZodType, newPrefix);
+        flatten(value as z.ZodType, newPrefix, { isOptional, lazyDepth });
       }
       return;
     }
 
     if (currentSubSchema instanceof z.ZodArray) {
-      flatten(currentSubSchema.element, `${prefix}.#`);
+      flatten(currentSubSchema.element, `${prefix}.#`, { isOptional, lazyDepth });
       return;
     }
 
@@ -40,39 +46,45 @@ export function flattenZodFormSchema<T extends $ZodType>(
       // The discriminator itself is a literal string; using z.string() matches tests
       flattenedSchemaMap.set(discPath, z.string());
       for (const option of currentSubSchema.options) {
-        flatten(option as z.ZodType, prefix);
+        flatten(option as z.ZodType, prefix, { isOptional, lazyDepth });
       }
       return;
     }
     if (currentSubSchema instanceof z.ZodUnion) {
       // Keep union as a single leaf at this path for coercion
-      flattenedSchemaMap.set(prefix, currentSubSchema);
+      const leaf = currentSubSchema as unknown as z.ZodType;
+      const isCollectionElement = prefix.endsWith('.#') || prefix.endsWith('.*');
+      flattenedSchemaMap.set(prefix, isOptional && !isCollectionElement ? z.optional(leaf) : leaf);
       return;
     }
 
     if (currentSubSchema instanceof z.ZodLazy) {
+      // Allow a deeper expansion to capture nested lazy structures
+      if (lazyDepth >= 3) return;
       const lazyValue = currentSubSchema.def.getter();
-      flatten(lazyValue, prefix);
+      flatten(lazyValue, prefix, { isOptional, lazyDepth: lazyDepth + 1 });
       return;
     }
 
     if (currentSubSchema instanceof z.ZodOptional) {
-      flatten(currentSubSchema.def.innerType, prefix);
+      flatten(currentSubSchema.def.innerType, prefix, { isOptional: true, lazyDepth });
       return;
     }
 
     if (currentSubSchema instanceof z.ZodDefault) {
-      flatten(currentSubSchema.def.innerType, prefix);
+      flatten(currentSubSchema.def.innerType, prefix, { isOptional, lazyDepth });
       return;
     }
 
     if (currentSubSchema instanceof z.ZodRecord) {
-      flatten(currentSubSchema.def.valueType, `${prefix}.*`);
+      flatten(currentSubSchema.def.valueType, `${prefix}.*`, { isOptional, lazyDepth });
       return;
     }
 
     // Leaf: store the schema at this path
-    flattenedSchemaMap.set(prefix, subSchema as z.ZodType);
+    const leaf = subSchema as z.ZodType;
+    const isCollectionElement = prefix.endsWith('.#') || prefix.endsWith('.*');
+    flattenedSchemaMap.set(prefix, isOptional && !isCollectionElement ? z.optional(leaf) : leaf);
   }
 
   flatten(schema);
