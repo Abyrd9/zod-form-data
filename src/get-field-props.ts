@@ -3,7 +3,7 @@ import { $ZodType } from "zod/v4/core";
 
 export type FieldProps<T> = {
 	name: string;
-	value: T | undefined | null;
+	value: T;
 	onChange: (payload: T | undefined | null) => void;
 	error: string | null;
 };
