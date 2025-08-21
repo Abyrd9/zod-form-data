@@ -121,6 +121,11 @@ export const useZodForm = <Schema extends $ZodType>({
     []
   );
 
+  const reset = useCallback(() => {
+    setFlattenedData(flattenZodFormData(schema, defaultValues ?? ({} as DeepPartial<z.infer<Schema>>)));
+    setInternalErrors(new Map<string, string>());
+  }, [schema, defaultValues]);
+
   // Don't love this useEffect, internal errors needs to be a state so we can set it
   // and we also want to update it when the passed in errors change as well.
   useEffect(() => {
@@ -208,6 +213,7 @@ export const useZodForm = <Schema extends $ZodType>({
     fields,
     getFieldArrayHelpers,
     setFieldErrors,
+    reset,
   } satisfies {
     fields: NestedFields<Schema>;
     getFieldArrayHelpers: <P extends ArrayPaths<Schema & z.ZodTypeAny>>(
@@ -217,6 +223,7 @@ export const useZodForm = <Schema extends $ZodType>({
       remove: (index: number) => void;
     };
     setFieldErrors: (errors: DeepPartial<NestedFieldErrors<Schema>>) => void;
+    reset: () => void;
   };
 };
 
