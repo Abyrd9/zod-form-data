@@ -1,6 +1,6 @@
 {
   "name": "@abyrd9/zod-form-data",
-  "version": "1.2.7",
+  "version": "1.2.8",
   "description": "Type-safe Zod v4 form utilities for React: parse FormData with coercion, flatten/unflatten data and errors, and build strongly-typed fields with array helpers.",
   "license": "MIT",
   "keywords": [
