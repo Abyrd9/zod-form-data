@@ -10,6 +10,9 @@ export function createZodFormDataErrorSchema<T extends $ZodType>(
   schema: T
 ): z.ZodType<Record<string, unknown>> {
   function transformSchema(s: $ZodType): z.ZodTypeAny {
+    if (!s) return z.optional(z.nullable(z.string()));
+
+    // TODO: I don't like this any cast
     const def = (s as any)._zod?.def;
     if (!def) return z.optional(z.nullable(z.string()));
 
