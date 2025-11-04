@@ -63,6 +63,14 @@ export type ArrayElementType<
         : never
       : never
     : never
+  : Path extends `${infer Key}.${number}.${infer Rest}`
+  ? Schema extends z.ZodObject<infer Shape>
+    ? Key extends keyof Shape
+      ? UnwrapModifiers<Shape[Key]> extends z.ZodArray<infer Item>
+        ? ArrayElementType<Item & z.ZodTypeAny, Rest>
+        : never
+      : never
+    : never
   : Path extends `${infer Key}.${infer Rest}`
   ? Schema extends z.ZodObject<infer Shape>
     ? Key extends keyof Shape
@@ -77,6 +85,14 @@ export type ArrayElementType<
     : never
   : never;
 
+// Helper type to replace # with ${number} to allow concrete indices at runtime
+type ReplaceHashWithNumber<T extends string> = 
+  T extends `${infer Before}.#.${infer After}`
+    ? `${Before}.${number}.${ReplaceHashWithNumber<After>}`
+    : T extends `${infer Before}.#`
+    ? `${Before}.${number}`
+    : T;
+
 export type ArrayPaths<
   T extends z.ZodTypeAny,
   Prefix extends string = ""
@@ -86,6 +102,7 @@ export type ArrayPaths<
         ?
             | `${Prefix}${K & string}`
             | ArrayPaths<Item & z.ZodTypeAny, `${Prefix}${K & string}.#.`>
+            | ReplaceHashWithNumber<`${Prefix}${K & string}` | ArrayPaths<Item & z.ZodTypeAny, `${Prefix}${K & string}.#.`>>
         : UnwrapModifiers<Shape[K]> extends z.ZodObject<any>
         ? ArrayPaths<UnwrapModifiers<Shape[K]>, `${Prefix}${K & string}.`>
         : never;
@@ -148,10 +165,10 @@ export const useZodForm = <Schema extends $ZodType>({
   const getFieldArrayHelpers = useCallback(
     <P extends ArrayPaths<Schema & z.ZodTypeAny>>(path: P) => {
       return {
-        add: (value: ArrayElementType<Schema & z.ZodTypeAny, P>) => {
+        add: (value: ArrayElementType<Schema & z.ZodTypeAny, P>, atIndex?: number) => {
           setFlattenedData((prev) => {
             const newData = { ...prev };
-            const currentArray = Object.keys(newData)
+            const currentMaxIndex = Object.keys(newData)
               .filter((key) => key.startsWith(`${path}.`))
               .reduce((max, key) => {
                 const match = key.match(new RegExp(`^${path}\\.(\\d+)`));
@@ -160,14 +177,32 @@ export const useZodForm = <Schema extends $ZodType>({
                   : max;
               }, -1);
 
-            const newIndex = currentArray + 1;
+            const insertIndex = atIndex !== undefined ? atIndex : currentMaxIndex + 1;
 
+            // If inserting in the middle or at a specific position, shift existing items
+            if (atIndex !== undefined && atIndex <= currentMaxIndex) {
+              // Shift items at insertIndex and beyond up by 1
+              for (const key of Object.keys(newData).sort().reverse()) {
+                const match = key.match(new RegExp(`^${path}\\.(\\d+)(.*)$`));
+                if (match) {
+                  const currentIndex = Number.parseInt(match[1], 10);
+                  const suffix = match[2] || '';
+                  if (currentIndex >= insertIndex) {
+                    const newKey = `${path}.${currentIndex + 1}${suffix}`;
+                    newData[newKey] = newData[key];
+                    delete newData[key];
+                  }
+                }
+              }
+            }
+
+            // Insert the new item
             if (typeof value === "object" && value !== null) {
               for (const [key, val] of Object.entries(value)) {
-                newData[`${path}.${newIndex}.${key}`] = val;
+                newData[`${path}.${insertIndex}.${key}`] = val;
               }
             } else {
-              newData[`${path}.${newIndex}`] = value;
+              newData[`${path}.${insertIndex}`] = value;
             }
 
             return newData;
@@ -204,6 +239,72 @@ export const useZodForm = <Schema extends $ZodType>({
             return newData;
           });
         },
+        move: (fromIndex: number, toIndex: number) => {
+          setFlattenedData((prev) => {
+            const newData = { ...prev };
+            
+            // Get all keys for the item we're moving
+            const itemKeys = Object.keys(newData).filter((key) => {
+              const match = key.match(new RegExp(`^${path}\\.(\\d+)(.*)$`));
+              return match && Number.parseInt(match[1], 10) === fromIndex;
+            });
+
+            if (itemKeys.length === 0) return prev; // Item doesn't exist
+
+            // Store the item data
+            const itemData: Record<string, any> = {};
+            for (const key of itemKeys) {
+              const match = key.match(new RegExp(`^${path}\\.(\\d+)(.*)$`));
+              if (match) {
+                const suffix = match[2] || '';
+                itemData[suffix] = newData[key];
+              }
+            }
+
+            // Remove the item from its current position
+            for (const key of itemKeys) {
+              delete newData[key];
+            }
+
+            // Determine the direction of the move
+            if (fromIndex < toIndex) {
+              // Moving down: shift items between fromIndex and toIndex down by 1
+              for (const key of Object.keys(newData)) {
+                const match = key.match(new RegExp(`^${path}\\.(\\d+)(.*)$`));
+                if (match) {
+                  const currentIndex = Number.parseInt(match[1], 10);
+                  const suffix = match[2] || '';
+                  if (currentIndex > fromIndex && currentIndex <= toIndex) {
+                    const newKey = `${path}.${currentIndex - 1}${suffix}`;
+                    newData[newKey] = newData[key];
+                    delete newData[key];
+                  }
+                }
+              }
+            } else if (fromIndex > toIndex) {
+              // Moving up: shift items between toIndex and fromIndex up by 1
+              for (const key of Object.keys(newData).sort().reverse()) {
+                const match = key.match(new RegExp(`^${path}\\.(\\d+)(.*)$`));
+                if (match) {
+                  const currentIndex = Number.parseInt(match[1], 10);
+                  const suffix = match[2] || '';
+                  if (currentIndex >= toIndex && currentIndex < fromIndex) {
+                    const newKey = `${path}.${currentIndex + 1}${suffix}`;
+                    newData[newKey] = newData[key];
+                    delete newData[key];
+                  }
+                }
+              }
+            }
+
+            // Insert the item at the new position
+            for (const [suffix, value] of Object.entries(itemData)) {
+              newData[`${path}.${toIndex}${suffix}`] = value;
+            }
+
+            return newData;
+          });
+        },
       };
     },
     []
@@ -219,8 +320,9 @@ export const useZodForm = <Schema extends $ZodType>({
     getFieldArrayHelpers: <P extends ArrayPaths<Schema & z.ZodTypeAny>>(
       path: P
     ) => {
-      add: (value: ArrayElementType<Schema & z.ZodTypeAny, P>) => void;
+      add: (value: ArrayElementType<Schema & z.ZodTypeAny, P>, atIndex?: number) => void;
       remove: (index: number) => void;
+      move: (fromIndex: number, toIndex: number) => void;
     };
     setFieldErrors: (errors: DeepPartial<NestedFieldErrors<Schema>>) => void;
     reset: () => void;
