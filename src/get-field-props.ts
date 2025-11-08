@@ -8,7 +8,54 @@ export type FieldProps<T> = {
 	error: string | null;
 };
 
-export type NestedFields<T extends $ZodType> = T extends { _zod: { def: { type: "object"; shape: infer Shape } } }
+/**
+ * Extracts all keys from a tuple of Zod object schemas
+ */
+type AllKeysFromOptions<Options extends readonly z.ZodTypeAny[]> = {
+  [I in keyof Options]: Options[I] extends z.ZodObject<infer Shape>
+    ? keyof Shape
+    : never;
+}[number];
+
+/**
+ * For a given key K, get the union of field types from all options that have that key
+ */
+type FieldTypeForKey<
+  Options extends readonly z.ZodTypeAny[],
+  K extends PropertyKey
+> = {
+  [I in keyof Options]: Options[I] extends z.ZodObject<infer Shape>
+    ? K extends keyof Shape
+      ? NestedFields<Shape[K] & z.ZodTypeAny>
+      : never
+    : never;
+}[number];
+
+/**
+ * Creates a merged object type with all keys from all options.
+ * All keys are present (not optional) since getFieldProps always creates fields for all keys.
+ * Each key's type is a union of the field types from all options that have that key.
+ */
+type MergeOptionFields<
+  Options extends readonly z.ZodTypeAny[],
+  Keys extends PropertyKey = AllKeysFromOptions<Options>
+> = {
+  [K in Keys]: FieldTypeForKey<Options, K>;
+};
+
+export type NestedFields<T extends $ZodType> = 
+	// Handle discriminated unions: return merged object with all keys
+	// In Zod v4, discriminated unions have type: "union" AND a discriminator field
+	T extends { _zod: { def: { type: "union"; discriminator: any; options: infer Options } } }
+	? Options extends readonly z.ZodTypeAny[]
+		? MergeOptionFields<Options>
+		: FieldProps<z.infer<T>>
+	// Handle regular unions: return merged object with all keys
+	: T extends { _zod: { def: { type: "union"; options: infer Options } } }
+	? Options extends readonly z.ZodTypeAny[]
+		? MergeOptionFields<Options>
+		: FieldProps<z.infer<T>>
+	: T extends { _zod: { def: { type: "object"; shape: infer Shape } } }
 	? { [K in keyof Shape]: NestedFields<Shape[K] & $ZodType> }
 	: T extends { _zod: { def: { type: "record"; valueType: infer Value } } }
 	? Record<string, NestedFields<Value & $ZodType>>
@@ -26,10 +73,6 @@ export type NestedFields<T extends $ZodType> = T extends { _zod: { def: { type: 
 	? NestedFields<Inner & $ZodType>
 	: T extends { _zod: { def: { type: "nullable"; innerType: infer Inner } } }
 	? NestedFields<Inner & $ZodType>
-	: T extends { _zod: { def: { type: "union"; options: infer Options } } }
-	? Options extends readonly $ZodType[]
-		? NestedFields<Options[number] & $ZodType>
-		: FieldProps<z.infer<T>>
 	: T extends { _zod: { def: { type: "intersection"; left: infer Left; right: infer Right } } }
 	? NestedFields<Left & $ZodType> & NestedFields<Right & $ZodType>
 	: T extends { _zod: { def: { type: "lazy"; getter: () => infer LazyType } } }
@@ -77,6 +120,74 @@ export function getFieldProps<T extends $ZodType>(
 		};
 		return { name, value, onChange, error } as FieldProps<z.infer<T>>;
 	};
+
+	// Handle discriminated unions up-front
+	if (field instanceof z.ZodDiscriminatedUnion) {
+		const discriminator: string =
+			((field as unknown as { _def?: { discriminator?: string } })._def?.discriminator as string) ??
+			(field as any).discriminator;
+
+		const discriminatorField = getFieldProps(
+			z.string() as unknown as $ZodType,
+			[...path, discriminator],
+			flattenedData,
+			setFlattenedData,
+			errors
+		) as unknown;
+
+		// Build a merged view that includes discriminator plus all option keys
+		const merged: Record<string, unknown> = {
+			[discriminator]: discriminatorField,
+		};
+
+		for (const opt of Array.from(field.options)) {
+			if (opt instanceof z.ZodObject) {
+				const shape = opt.shape ?? (opt as any).shape ?? {};
+				for (const key of Object.keys(shape)) {
+					if (key === discriminator) continue;
+					// Avoid re-building the same key if multiple options share it
+					if (merged[key] !== undefined) continue;
+					merged[key] = getFieldProps(
+						shape[key] as $ZodType,
+						[...path, key],
+						flattenedData,
+						setFlattenedData,
+						errors
+					) as unknown;
+				}
+			}
+		}
+
+		return merged as unknown as NestedFields<T>;
+	}
+	
+	// Heuristic support for non-discriminated unions
+	if (field instanceof z.ZodUnion) {
+		const options = (field as unknown as z.ZodUnion<[z.ZodTypeAny, ...z.ZodTypeAny[]]>).options as z.ZodTypeAny[];
+		const prefix = currentPath ? `${currentPath}.` : "";
+		const objectOptions = options.filter((opt) => opt instanceof z.ZodObject) as z.ZodObject<any>[];
+
+		// If there are object options, expose the union of their keys
+		if (objectOptions.length > 0) {
+			const merged: Record<string, unknown> = {};
+			for (const opt of objectOptions) {
+				const shape = opt.shape ?? {};
+				for (const key of Object.keys(shape)) {
+					if (merged[key] !== undefined) continue;
+					merged[key] = getFieldProps(
+						shape[key] as $ZodType,
+						[...path, key],
+						flattenedData,
+						setFlattenedData,
+						errors
+					) as unknown;
+				}
+			}
+			return merged as unknown as NestedFields<T>;
+		}
+		// Otherwise, treat as a leaf at current path
+		return buildLeaf() as unknown as NestedFields<T>;
+	}
 
 	switch (def.type) {
 		case "object": {

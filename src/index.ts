@@ -10,6 +10,79 @@ import { $ZodType } from "zod/v4/core";
 // NestedFieldErrors type is defined in flatten-zod-form-errors to avoid divergence
 
 type TupleKeys<T extends any[]> = Exclude<keyof T, keyof any[]>;
+
+/**
+ * Extracts all keys from a tuple of Zod object schemas
+ */
+type AllKeysFromOptions<Options extends readonly z.ZodTypeAny[]> = {
+  [I in keyof Options]: Options[I] extends z.ZodObject<infer Shape>
+    ? keyof Shape
+    : never;
+}[number];
+
+/**
+ * For a given key K, get the union of field types from all options that have that key
+ */
+type FieldTypeForKey<
+  Options extends readonly z.ZodTypeAny[],
+  K extends PropertyKey
+> = {
+  [I in keyof Options]: Options[I] extends z.ZodObject<infer Shape>
+    ? K extends keyof Shape
+      ? NestedFields<Shape[K] & z.ZodTypeAny>
+      : never
+    : never;
+}[number];
+
+/**
+ * Creates a merged object type with all keys from all options.
+ * All keys are present (not optional) since getFieldProps always creates fields for all keys.
+ * Each key's type is a union of the field types from all options that have that key.
+ */
+type MergeOptionFields<
+  Options extends readonly z.ZodTypeAny[],
+  Keys extends PropertyKey = AllKeysFromOptions<Options>
+> = {
+  [K in Keys]: FieldTypeForKey<Options, K>;
+};
+
+/**
+ * Utility type to cast discriminated union fields from getFieldProps.
+ * At runtime, getFieldProps returns a merged object with all possible keys from all union options.
+ * 
+ * Usage:
+ *   const field = result.fields.myUnionField;
+ *   // TypeScript sees: Option1 | Option2 | Option3
+ *   // Runtime has: all keys from all options present
+ *   
+ * To access option-specific fields without TypeScript errors, use optional chaining:
+ *   field.optionSpecificProp?.name
+ * 
+ * Or narrow the type using the discriminator:
+ *   if (field.discriminator.value === "option1") {
+ *     // Now TypeScript knows which option, but runtime still has all keys
+ *   }
+ */
+export type DiscriminatedFields<
+  S extends z.ZodTypeAny
+> = S extends z.ZodDiscriminatedUnion<any, infer Options>
+  ? Options extends readonly z.ZodTypeAny[]
+    ? MergeOptionFields<Options>
+    : never
+  : never;
+
+/**
+ * Utility type to cast non-discriminated union fields from getFieldProps.
+ * Similar to DiscriminatedFields. At runtime, all possible keys are present.
+ * Use optional chaining to access fields that don't exist in all union options.
+ */
+export type UnionFields<
+  S extends z.ZodTypeAny
+> = S extends z.ZodUnion<
+  infer Tuple extends [z.ZodTypeAny, ...z.ZodTypeAny[]]
+>
+  ? MergeOptionFields<Tuple>
+  : never;
 export type ZodPaths<T extends $ZodType> = T extends z.ZodObject<infer Shape>
   ? {
       [K in keyof Shape]: Shape[K] extends z.ZodArray<infer Item>
