@@ -97,8 +97,6 @@ function TestForm() {
     schema: Content,
   });
 
-  console.log(fields);
-
   return null;
 }
 

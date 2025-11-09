@@ -140,22 +140,36 @@ export function getFieldProps<T extends $ZodType>(
 			[discriminator]: discriminatorField,
 		};
 
+		// First pass: collect all schemas for each key across all options
+		const keySchemas: Record<string, z.ZodTypeAny[]> = {};
 		for (const opt of Array.from(field.options)) {
 			if (opt instanceof z.ZodObject) {
 				const shape = opt.shape ?? (opt as any).shape ?? {};
 				for (const key of Object.keys(shape)) {
 					if (key === discriminator) continue;
-					// Avoid re-building the same key if multiple options share it
-					if (merged[key] !== undefined) continue;
-					merged[key] = getFieldProps(
-						shape[key] as $ZodType,
-						[...path, key],
-						flattenedData,
-						setFlattenedData,
-						errors
-					) as unknown;
+					if (!keySchemas[key]) {
+						keySchemas[key] = [];
+					}
+					keySchemas[key].push(shape[key]);
 				}
 			}
+		}
+
+		// Second pass: create union schemas for each key
+		for (const [key, schemas] of Object.entries(keySchemas)) {
+			// If only one schema, use it directly
+			// If multiple schemas, create a union
+			const unionSchema = schemas.length === 1 
+				? schemas[0] 
+				: z.union(schemas as [z.ZodTypeAny, z.ZodTypeAny, ...z.ZodTypeAny[]]);
+			
+			merged[key] = getFieldProps(
+				unionSchema as $ZodType,
+				[...path, key],
+				flattenedData,
+				setFlattenedData,
+				errors
+			) as unknown;
 		}
 
 		return merged as unknown as NestedFields<T>;
@@ -170,19 +184,36 @@ export function getFieldProps<T extends $ZodType>(
 		// If there are object options, expose the union of their keys
 		if (objectOptions.length > 0) {
 			const merged: Record<string, unknown> = {};
+			
+			// First pass: collect all schemas for each key across all options
+			const keySchemas: Record<string, z.ZodTypeAny[]> = {};
 			for (const opt of objectOptions) {
 				const shape = opt.shape ?? {};
 				for (const key of Object.keys(shape)) {
-					if (merged[key] !== undefined) continue;
-					merged[key] = getFieldProps(
-						shape[key] as $ZodType,
-						[...path, key],
-						flattenedData,
-						setFlattenedData,
-						errors
-					) as unknown;
+					if (!keySchemas[key]) {
+						keySchemas[key] = [];
+					}
+					keySchemas[key].push(shape[key]);
 				}
 			}
+			
+			// Second pass: create union schemas for each key
+			for (const [key, schemas] of Object.entries(keySchemas)) {
+				// If only one schema, use it directly
+				// If multiple schemas, create a union
+				const unionSchema = schemas.length === 1 
+					? schemas[0] 
+					: z.union(schemas as [z.ZodTypeAny, z.ZodTypeAny, ...z.ZodTypeAny[]]);
+				
+				merged[key] = getFieldProps(
+					unionSchema as $ZodType,
+					[...path, key],
+					flattenedData,
+					setFlattenedData,
+					errors
+				) as unknown;
+			}
+			
 			return merged as unknown as NestedFields<T>;
 		}
 		// Otherwise, treat as a leaf at current path
