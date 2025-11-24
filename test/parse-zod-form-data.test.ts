@@ -17,7 +17,6 @@ describe("parseFormData", () => {
     expect(result).toEqual({
       success: true,
       data: { name: "John", age: 30 },
-      errors: null,
     });
   });
 
@@ -34,7 +33,6 @@ describe("parseFormData", () => {
     const result = parseFormData(formData, { schema });
     expect(result).toEqual({
       success: false,
-      data: null,
       errors: {
         form: undefined,
         global: undefined,
@@ -75,7 +73,6 @@ describe("parseFormData", () => {
           address: { street: "123 Main St", city: "Boston" },
         },
       },
-      errors: null,
     });
   });
 
@@ -108,7 +105,6 @@ describe("parseFormData", () => {
           { name: "Jane", age: 25 },
         ],
       },
-      errors: null,
     });
   });
 
@@ -131,7 +127,6 @@ describe("parseFormData", () => {
         metadata: { key1: "value1", key2: "value2" },
         settings: { timeout: 5000, limit: 100 },
       },
-      errors: null,
     });
   });
 
@@ -158,7 +153,6 @@ describe("parseFormData", () => {
         name: "John",
         address: { street: "123 Main St" },
       },
-      errors: null,
     });
   });
 
@@ -174,7 +168,6 @@ describe("parseFormData", () => {
     const result = parseFormData(formData, { schema });
     expect(result).toEqual({
       success: false,
-      data: null,
       errors: {
         form: undefined,
         global: undefined,
@@ -206,7 +199,6 @@ describe("parseFormData", () => {
     const result = parseFormData(formData, { schema });
     expect(result).toEqual({
       success: false,
-      data: null,
       errors: {
         form: undefined,
         global: undefined,
@@ -228,7 +220,6 @@ describe("parseFormData", () => {
     expect(result).toEqual({
       success: true,
       data: { coords: [40.7128, -74.006] },
-      errors: null,
     });
   });
 
@@ -252,7 +243,6 @@ describe("parseFormData", () => {
         scores: { math: 95, science: 90 },
         labels: ["x", "y"],
       },
-      errors: null,
     });
   });
 
@@ -265,7 +255,6 @@ describe("parseFormData", () => {
     expect(result).toEqual({
       success: true,
       data: { agree: true },
-      errors: null,
     });
   });
 
@@ -276,7 +265,6 @@ describe("parseFormData", () => {
     const result = parseFormData(formData, { schema });
     expect(result).toEqual({
       success: false,
-      data: null,
       errors: {
         form: undefined,
         global: undefined,
@@ -297,7 +285,6 @@ describe("parseFormData", () => {
     expect(result).toEqual({
       success: true,
       data: { middle: null },
-      errors: null,
     });
   });
 
@@ -310,7 +297,6 @@ describe("parseFormData", () => {
     expect(result).toEqual({
       success: true,
       data: { value: 42 },
-      errors: null,
     });
   });
 
@@ -322,7 +308,6 @@ describe("parseFormData", () => {
     expect(result).toEqual({
       success: true,
       data: { value: "hello" },
-      errors: null,
     });
   });
 });

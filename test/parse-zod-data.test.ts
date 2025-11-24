@@ -18,7 +18,6 @@ describe("parseData", () => {
     expect(result).toEqual({
       success: true,
       data: { name: "John", age: 30 },
-      errors: null,
     });
   });
 
@@ -36,7 +35,6 @@ describe("parseData", () => {
     const result = parseData(data, { schema });
     expect(result).toEqual({
       success: false,
-      data: null,
       errors: {
         form: undefined,
         global: undefined,
@@ -77,7 +75,6 @@ describe("parseData", () => {
     expect(result).toEqual({
       success: true,
       data,
-      errors: null,
     });
   });
 
@@ -104,7 +101,6 @@ describe("parseData", () => {
     expect(result).toEqual({
       success: true,
       data,
-      errors: null,
     });
   });
 
@@ -124,7 +120,6 @@ describe("parseData", () => {
     expect(result).toEqual({
       success: true,
       data,
-      errors: null,
     });
   });
 
@@ -149,7 +144,6 @@ describe("parseData", () => {
     expect(result).toEqual({
       success: true,
       data,
-      errors: null,
     });
   });
 
@@ -166,7 +160,6 @@ describe("parseData", () => {
     const result = parseData(data, { schema });
     expect(result).toEqual({
       success: false,
-      data: null,
       errors: {
         form: undefined,
         global: undefined,
@@ -199,7 +192,6 @@ describe("parseData", () => {
     const result = parseData(data, { schema });
     expect(result).toEqual({
       success: false,
-      data: null,
       errors: {
         form: undefined,
         global: undefined,
@@ -221,7 +213,6 @@ describe("parseData", () => {
     expect(result).toEqual({
       success: true,
       data,
-      errors: null,
     });
   });
 
@@ -244,7 +235,6 @@ describe("parseData", () => {
     expect(result).toEqual({
       success: true,
       data,
-      errors: null,
     });
   });
 });

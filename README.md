@@ -63,13 +63,12 @@ When parsing fails, both `parseFormData` and `parseData` return:
 
 ```ts
 {
-  success: false,
-  data: null,
+  success: false;
   errors: {
     form?: string;
     global?: string;
-    fields: DeepPartial<NestedFieldErrors<Schema>>;
-    flattened: FlattenedFormErrors<Schema> & {
+    fields?: DeepPartial<NestedFieldErrors<Schema>>;
+    flattened?: FlattenedFormErrors<Schema> & {
       form?: string;
       global?: string;
     };

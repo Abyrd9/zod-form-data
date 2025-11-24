@@ -19,22 +19,22 @@ type FlattenedErrorsWithMeta<T extends $ZodType> = Partial<
 >;
 
 export type ParseErrors<T extends $ZodType> = {
-  form?: string;
-  global?: string;
-  fields: DeepPartial<NestedFieldErrors<T>>;
-  flattened: FlattenedErrorsWithMeta<T>;
+	form?: string;
+	global?: string;
+	fields?: DeepPartial<NestedFieldErrors<T>>;
+	flattened?: FlattenedErrorsWithMeta<T>;
 };
 
 export type ParseSuccess<T extends $ZodType> = {
-  success: true;
-  data: z.infer<T>;
-  errors: null;
+	success: true;
+	data: z.infer<T>;
+	errors?: undefined;
 };
 
 export type ParseFailure<T extends $ZodType> = {
-  success: false;
-  data: null;
-  errors: ParseErrors<T>;
+	success: false;
+	data?: undefined;
+	errors: ParseErrors<T>;
 };
 
 export type ParseResult<T extends $ZodType> = ParseSuccess<T> | ParseFailure<T>;
@@ -168,7 +168,6 @@ export const parseFormData = <T extends $ZodType>(
     return {
       success: true,
       data: validatedData.data,
-      errors: null,
     };
   }
 
@@ -191,13 +190,11 @@ export const parseFormData = <T extends $ZodType>(
     return {
       success: true,
       data: validatedData.success ? validatedData.data : (unflattenedData as z.infer<T>),
-      errors: null,
     };
   }
 
   return {
     success: false,
-    data: null,
     errors: buildErrorPayload(mergedErrors, { form: undefined, global: undefined }),
   };
 };
@@ -221,7 +218,6 @@ export const parseData = <T extends $ZodType>(
       );
       return {
         success: false,
-        data: null,
         errors: buildErrorPayload(flattenedErrors, {
           form: undefined,
           global: undefined,
@@ -232,14 +228,12 @@ export const parseData = <T extends $ZodType>(
     return {
       success: true,
       data: validatedData.data,
-      errors: null,
     };
   } catch (error) {
     if (error instanceof ZodError) {
       const flattenedErrors = collectFlattenedErrors<T>(error.issues);
       return {
         success: false,
-        data: null,
         errors: buildErrorPayload(flattenedErrors, {
           form: undefined,
           global: undefined,
@@ -249,7 +243,6 @@ export const parseData = <T extends $ZodType>(
     const flattenedErrors: FlattenedErrorsWithMeta<T> = {};
     return {
       success: false,
-      data: null,
       errors: buildErrorPayload(flattenedErrors, {
         form: undefined,
         global: undefined,
