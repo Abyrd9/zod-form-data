@@ -34,14 +34,19 @@ export function flattenZodFormSchema<T extends $ZodType>(
       if (items.length === 1) {
         flattenedSchemaMap.set(`${prefix}.#`, items[0] as z.ZodType);
       } else if (items.length > 1) {
-        flattenedSchemaMap.set(`${prefix}.#`, z.union(items as any));
+        const tupleForUnion = items as unknown as [
+          z.ZodTypeAny,
+          z.ZodTypeAny,
+          ...z.ZodTypeAny[]
+        ];
+        flattenedSchemaMap.set(`${prefix}.#`, z.union(tupleForUnion));
       }
       return;
     }
 
     // Discriminated unions: include the discriminator path and flatten option fields
     if (currentSubSchema instanceof z.ZodDiscriminatedUnion) {
-      const discriminator = (currentSubSchema as any)._def?.discriminator ?? (currentSubSchema as any).discriminator;
+      const discriminator = currentSubSchema._def.discriminator;
       const discPath = prefix ? `${prefix}.${discriminator}` : discriminator;
       // The discriminator itself is a literal string; using z.string() matches tests
       flattenedSchemaMap.set(discPath, z.string());

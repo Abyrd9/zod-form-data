@@ -12,8 +12,7 @@ export function createZodFormDataErrorSchema<T extends $ZodType>(
   function transformSchema(s: $ZodType): z.ZodTypeAny {
     if (!s) return z.optional(z.nullable(z.string()));
 
-    // TODO: I don't like this any cast
-    const def = (s as any)._zod?.def;
+    const def = s._zod?.def;
     if (!def) return z.optional(z.nullable(z.string()));
 
     const type = def.type;

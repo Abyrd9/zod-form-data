@@ -4,14 +4,74 @@ import { coerceFormData } from "./coerce-form-data";
 import type { DeepPartial } from "./deep-partial";
 import { flattenZodFormSchema } from "./flatten-zod-form-schema";
 import { unflattenZodFormData } from "./unflatten-zod-form-data";
+import { unflattenZodFormErrors } from "./unflatten-zod-form-errors";
 import type { $ZodType } from "zod/v4/core";
+import type {
+  FlattenedFormData,
+  FlattenedFormErrors,
+  FlattenedPaths,
+} from "./schema-paths";
 
-type ParseResult<T extends $ZodType> =
-  | { success: true; data: z.infer<T> }
-  | {
-      success: false;
-      errors: DeepPartial<NestedFieldErrors<T>> | Record<string, string>;
-    };
+type MetaKeys = "form" | "global";
+
+type FlattenedErrorsWithMeta<T extends $ZodType> = Partial<
+  Record<FlattenedPaths<T> | MetaKeys, string>
+>;
+
+export type ParseErrors<T extends $ZodType> = {
+  form?: string;
+  global?: string;
+  fields: DeepPartial<NestedFieldErrors<T>>;
+  flattened: FlattenedErrorsWithMeta<T>;
+};
+
+export type ParseSuccess<T extends $ZodType> = {
+  success: true;
+  data: z.infer<T>;
+  errors: null;
+};
+
+export type ParseFailure<T extends $ZodType> = {
+  success: false;
+  data: null;
+  errors: ParseErrors<T>;
+};
+
+export type ParseResult<T extends $ZodType> = ParseSuccess<T> | ParseFailure<T>;
+
+const collectFlattenedErrors = <Schema extends $ZodType>(
+  issues: ReadonlyArray<z.ZodIssue>
+): FlattenedErrorsWithMeta<Schema> => {
+  const flattened: FlattenedErrorsWithMeta<Schema> = {};
+  for (const issue of issues) {
+    const path = issue.path.join(".");
+    if (path) {
+      flattened[path as FlattenedPaths<Schema>] = issue.message;
+    }
+  }
+  return flattened;
+};
+
+const extractFieldErrors = <Schema extends $ZodType>(
+  flattened: FlattenedErrorsWithMeta<Schema>
+): FlattenedFormErrors<Schema> => {
+  const entries = Object.entries(flattened).filter(
+    ([key]) => key !== "form" && key !== "global"
+  );
+  return Object.fromEntries(entries) as FlattenedFormErrors<Schema>;
+};
+
+const buildErrorPayload = <Schema extends $ZodType>(
+  flattened: FlattenedErrorsWithMeta<Schema>,
+  overrides?: Partial<Pick<ParseErrors<Schema>, MetaKeys>>
+): ParseErrors<Schema> => {
+  return {
+    form: overrides?.form ?? flattened.form,
+    global: overrides?.global ?? flattened.global,
+    fields: unflattenZodFormErrors<Schema>(extractFieldErrors(flattened)),
+    flattened,
+  };
+};
 
 function matchWildcardString(pattern: string, key: string): boolean {
   const patternParts = pattern.split(".");
@@ -26,7 +86,7 @@ function matchWildcardString(pattern: string, key: string): boolean {
   });
 }
 
-export const parseZodFormData = <T extends $ZodType>(
+export const parseFormData = <T extends $ZodType>(
   form: FormData,
   {
     schema,
@@ -35,7 +95,7 @@ export const parseZodFormData = <T extends $ZodType>(
   }
 ): ParseResult<T> => {
   const result: Record<string, unknown> = {};
-  const errors: Record<string, string> = {};
+  const coercionErrors: Record<string, string> = {};
 
   // Get the flattened schema for type coercion
   const flattenedZodSchema = flattenZodFormSchema(schema);
@@ -53,37 +113,43 @@ export const parseZodFormData = <T extends $ZodType>(
 
     if (matchingSchema) {
       try {
-        // For numbers, first try to coerce to number
         if (matchingSchema instanceof z.ZodNumber) {
           const num = Number(formDataValue);
-          if (!isNaN(num)) {
+          if (!Number.isNaN(num)) {
             result[key] = num;
           } else {
-            errors[key] = "Expected number, received string";
+            coercionErrors[key] = "Expected number, received string";
             result[key] = formDataValue;
           }
         } else {
-          // Use coerceFormData for other types
           const coercedValue = coerceFormData(
             matchingSchema as z.ZodType
           ).parse(formDataValue);
           result[key] = coercedValue;
         }
       } catch (error) {
-        if (error instanceof ZodError) {
-          let added = false;
-          for (const zodError of error.issues) {
-            const path = zodError.path.join(".");
-            if (path) {
-              errors[path] = zodError.message;
-              added = true;
+        const shouldRecordError =
+          !(matchingSchema instanceof z.ZodUnion) &&
+          !(matchingSchema instanceof z.ZodDiscriminatedUnion);
+
+        if (shouldRecordError) {
+          if (error instanceof ZodError) {
+            let added = false;
+            for (const zodError of error.issues) {
+              const path = zodError.path.join(".");
+              if (path) {
+                coercionErrors[path] = zodError.message;
+                added = true;
+              }
             }
+            if (!added) {
+              coercionErrors[key] =
+                error.issues[0]?.message ?? "Invalid value";
+            }
+          } else {
+            coercionErrors[key] =
+              "An unexpected error occurred during coercion";
           }
-          if (!added) {
-            errors[key] = error.issues[0]?.message ?? "Invalid value";
-          }
-        } else {
-          errors[key] = "An unexpected error occurred during coercion";
         }
         result[key] = formDataValue;
       }
@@ -92,48 +158,52 @@ export const parseZodFormData = <T extends $ZodType>(
     }
   }
 
-  // Second pass: Validate the coerced data
-  try {
-    const unflattenedData = unflattenZodFormData(result);
-    // @ts-expect-error - This is a schema
-    const validatedData = schema.safeParse(unflattenedData);
+  const flattenedData = result as FlattenedFormData<T>;
+  const unflattenedData = unflattenZodFormData<T>(flattenedData);
 
-    if (!validatedData.success) {
-      const validationErrors: Record<string, string> = {};
-      for (const error of validatedData.error.issues) {
-        const path = error.path.join(".");
-        if (path) {
-          // Only add errors with non-empty paths
-          validationErrors[path] = error.message;
-        }
-      }
-      // Merge validation errors with coercion errors, preferring validation errors
-      const finalErrors = { ...errors, ...validationErrors };
-      return { success: false, errors: finalErrors };
-    } else {
-      return { success: true, data: validatedData.data };
-    }
-  } catch (error) {
-    if (error instanceof ZodError) {
-      for (const zodError of error.issues) {
-        const path = zodError.path.join(".");
-        if (!errors[path]) {
-          errors[path] = zodError.message;
-        }
+  // @ts-expect-error - schema is a Zod v4 schema
+  const validatedData = schema.safeParse(unflattenedData);
+
+  if (validatedData.success && Object.keys(coercionErrors).length === 0) {
+    return {
+      success: true,
+      data: validatedData.data,
+      errors: null,
+    };
+  }
+
+  const validationErrors: Record<string, string> = {};
+  if (!validatedData.success) {
+    for (const issue of validatedData.error.issues) {
+      const path = issue.path.join(".");
+      if (path) {
+        validationErrors[path] = issue.message;
       }
     }
   }
 
-  // If we have any errors, return them
-  if (Object.keys(errors).length > 0) {
-    return { success: false, errors };
+  const mergedErrors: FlattenedErrorsWithMeta<T> = {
+    ...coercionErrors,
+    ...validationErrors,
+  };
+
+  if (Object.keys(mergedErrors).length === 0) {
+    return {
+      success: true,
+      data: validatedData.success ? validatedData.data : (unflattenedData as z.infer<T>),
+      errors: null,
+    };
   }
 
-  return { success: false, errors: {} };
+  return {
+    success: false,
+    data: null,
+    errors: buildErrorPayload(mergedErrors, { form: undefined, global: undefined }),
+  };
 };
 
-export const parseZodData = <T extends $ZodType>(
-  data: z.infer<T>,
+export const parseData = <T extends $ZodType>(
+  data: unknown,
   {
     schema,
   }: {
@@ -146,24 +216,44 @@ export const parseZodData = <T extends $ZodType>(
     const validatedData = schema.safeParse(data);
 
     if (!validatedData.success) {
-      const errors: Record<string, string> = {};
-      for (const error of validatedData.error.issues) {
-        const path = error.path.join(".");
-        errors[path] = error.message;
-      }
-      return { success: false, errors };
+      const flattenedErrors = collectFlattenedErrors<T>(
+        validatedData.error.issues
+      );
+      return {
+        success: false,
+        data: null,
+        errors: buildErrorPayload(flattenedErrors, {
+          form: undefined,
+          global: undefined,
+        }),
+      };
     }
 
-    return { success: true, data: validatedData.data };
+    return {
+      success: true,
+      data: validatedData.data,
+      errors: null,
+    };
   } catch (error) {
     if (error instanceof ZodError) {
-      const errors: Record<string, string> = {};
-      for (const zodError of error.issues) {
-        const path = zodError.path.join(".");
-        errors[path] = zodError.message;
-      }
-      return { success: false, errors };
+      const flattenedErrors = collectFlattenedErrors<T>(error.issues);
+      return {
+        success: false,
+        data: null,
+        errors: buildErrorPayload(flattenedErrors, {
+          form: undefined,
+          global: undefined,
+        }),
+      };
     }
-    return { success: false, errors: {} };
+    const flattenedErrors: FlattenedErrorsWithMeta<T> = {};
+    return {
+      success: false,
+      data: null,
+      errors: buildErrorPayload(flattenedErrors, {
+        form: undefined,
+        global: undefined,
+      }),
+    };
   }
 };

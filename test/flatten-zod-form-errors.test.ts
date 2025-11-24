@@ -4,10 +4,9 @@ import type { NestedFieldErrors } from "../src";
 import { z } from "zod/v4";
 
 describe("flattenZodFormErrors", () => {
-  test("returns empty Map when no errors provided", () => {
+  test("returns empty object when no errors provided", () => {
     const result = flattenZodFormErrors();
-    expect(result).toBeInstanceOf(Map);
-    expect(result.size).toBe(0);
+    expect(result).toEqual({});
   });
 
   test("flattens simple error object", () => {
@@ -22,7 +21,7 @@ describe("flattenZodFormErrors", () => {
     };
 
     const result = flattenZodFormErrors(errors);
-    expect(Object.fromEntries(result)).toEqual({
+    expect(result).toEqual({
       name: "Name is required",
       email: "Invalid email format",
     });
@@ -50,7 +49,7 @@ describe("flattenZodFormErrors", () => {
     };
 
     const result = flattenZodFormErrors(errors);
-    expect(Object.fromEntries(result)).toEqual({
+    expect(result).toEqual({
       "user.name": "Name is required",
       "user.address.street": "Street is required",
       "user.address.city": "City is required",
@@ -71,7 +70,7 @@ describe("flattenZodFormErrors", () => {
     };
 
     const result = flattenZodFormErrors(errors);
-    expect(Object.fromEntries(result)).toEqual({
+    expect(result).toEqual({
       "items.0": "First item is invalid",
       "items.1": "Second item is invalid",
       "items.2": "Third item is invalid",
@@ -103,7 +102,7 @@ describe("flattenZodFormErrors", () => {
     };
 
     const result = flattenZodFormErrors(errors);
-    expect(Object.fromEntries(result)).toEqual({
+    expect(result).toEqual({
       "users.0.name": "Name is required",
       "users.0.email": "Invalid email",
       "users.1.name": "Name too short",
@@ -146,7 +145,7 @@ describe("flattenZodFormErrors", () => {
     };
 
     const result = flattenZodFormErrors(errors);
-    expect(Object.fromEntries(result)).toEqual({
+    expect(result).toEqual({
       "profile.personal.name": "Name is required",
       "profile.personal.age": "Must be over 18",
       "profile.contacts.0.email": "Invalid email",
@@ -169,7 +168,7 @@ describe("flattenZodFormErrors", () => {
     };
 
     const result = flattenZodFormErrors(errors);
-    expect(Object.fromEntries(result)).toEqual({
+    expect(result).toEqual({
       name: "Name is required",
     });
   });
@@ -190,6 +189,6 @@ describe("flattenZodFormErrors", () => {
     };
 
     const result = flattenZodFormErrors(errors);
-    expect(Object.fromEntries(result)).toEqual({});
+    expect(result).toEqual({});
   });
 });

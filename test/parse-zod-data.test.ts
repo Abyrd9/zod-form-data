@@ -1,8 +1,8 @@
 import { describe, expect, test } from "vitest";
 import { z } from "zod/v4";
-import { parseZodData } from "../src/parse-zod-form-data";
+import { parseData } from "../src";
 
-describe("parseZodData", () => {
+describe("parseData", () => {
   test("parses basic data", () => {
     const schema = z.object({
       name: z.string(),
@@ -14,13 +14,11 @@ describe("parseZodData", () => {
       age: 30,
     };
 
-    const result = parseZodData(data, { schema });
+    const result = parseData(data, { schema });
     expect(result).toEqual({
       success: true,
-      data: {
-        name: "John",
-        age: 30,
-      },
+      data: { name: "John", age: 30 },
+      errors: null,
     });
   });
 
@@ -35,12 +33,21 @@ describe("parseZodData", () => {
       age: 16,
     };
 
-    const result = parseZodData(data, { schema });
+    const result = parseData(data, { schema });
     expect(result).toEqual({
       success: false,
+      data: null,
       errors: {
-        email: "Invalid email address",
-        age: "Too small: expected number to be >=18",
+        form: undefined,
+        global: undefined,
+        fields: {
+          email: "Invalid email address",
+          age: "Too small: expected number to be >=18",
+        },
+        flattened: {
+          email: "Invalid email address",
+          age: "Too small: expected number to be >=18",
+        },
       },
     });
   });
@@ -66,10 +73,11 @@ describe("parseZodData", () => {
       },
     };
 
-    const result = parseZodData(data, { schema });
+    const result = parseData(data, { schema });
     expect(result).toEqual({
       success: true,
       data,
+      errors: null,
     });
   });
 
@@ -92,8 +100,12 @@ describe("parseZodData", () => {
       ],
     };
 
-    const result = parseZodData(data, { schema });
-    expect(result).toEqual({ success: true, data });
+    const result = parseData(data, { schema });
+    expect(result).toEqual({
+      success: true,
+      data,
+      errors: null,
+    });
   });
 
   test("handles record types", () => {
@@ -108,8 +120,12 @@ describe("parseZodData", () => {
       },
     };
 
-    const result = parseZodData(data, { schema });
-    expect(result).toEqual({ success: true, data });
+    const result = parseData(data, { schema });
+    expect(result).toEqual({
+      success: true,
+      data,
+      errors: null,
+    });
   });
 
   test("handles optional fields", () => {
@@ -129,8 +145,12 @@ describe("parseZodData", () => {
       },
     };
 
-    const result = parseZodData(data, { schema });
-    expect(result).toEqual({ success: true, data });
+    const result = parseData(data, { schema });
+    expect(result).toEqual({
+      success: true,
+      data,
+      errors: null,
+    });
   });
 
   test("handles missing required fields", () => {
@@ -141,13 +161,21 @@ describe("parseZodData", () => {
 
     const data = {
       name: "John",
-    } as any;
+    };
 
-    const result = parseZodData(data, { schema });
+    const result = parseData(data, { schema });
     expect(result).toEqual({
       success: false,
+      data: null,
       errors: {
-        email: "Invalid input: expected string, received undefined",
+        form: undefined,
+        global: undefined,
+        fields: {
+          email: "Invalid input: expected string, received undefined",
+        },
+        flattened: {
+          email: "Invalid input: expected string, received undefined",
+        },
       },
     });
   });
@@ -168,11 +196,19 @@ describe("parseZodData", () => {
       confirmPassword: "secret124",
     };
 
-    const result = parseZodData(data, { schema });
+    const result = parseData(data, { schema });
     expect(result).toEqual({
       success: false,
+      data: null,
       errors: {
-        confirmPassword: "Passwords don't match",
+        form: undefined,
+        global: undefined,
+        fields: {
+          confirmPassword: "Passwords don't match",
+        },
+        flattened: {
+          confirmPassword: "Passwords don't match",
+        },
       },
     });
   });
@@ -181,8 +217,12 @@ describe("parseZodData", () => {
   test("handles tuples", () => {
     const schema = z.object({ coords: z.tuple([z.number(), z.number()]) });
     const data = { coords: [40.7128, -74.006] as [number, number] };
-    const result = parseZodData(data, { schema });
-    expect(result).toEqual({ success: true, data });
+    const result = parseData(data, { schema });
+    expect(result).toEqual({
+      success: true,
+      data,
+      errors: null,
+    });
   });
 
   // NEW: map and set
@@ -200,7 +240,11 @@ describe("parseZodData", () => {
       labels: new Set<string>(["x", "y"]),
     };
 
-    const result = parseZodData(data, { schema });
-    expect(result).toEqual({ success: true, data });
+    const result = parseData(data, { schema });
+    expect(result).toEqual({
+      success: true,
+      data,
+      errors: null,
+    });
   });
 });

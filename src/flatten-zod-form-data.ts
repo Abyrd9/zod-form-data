@@ -1,5 +1,6 @@
 import { z } from "zod/v4";
 import type { DeepPartial } from "./deep-partial";
+import type { FlattenedFormData } from "./schema-paths";
 import { $ZodType } from "zod/v4/core";
 
 /**
@@ -64,8 +65,36 @@ import { $ZodType } from "zod/v4/core";
 export function flattenZodFormData<T extends $ZodType>(
   schema: T,
   data: DeepPartial<z.infer<T>>
-) {
+): FlattenedFormData<T> {
   const flattenedDataMap = new Map<string, unknown>();
+
+  type DiscriminatedUnionInternal = z.ZodDiscriminatedUnion<
+    readonly [z.ZodTypeAny, ...z.ZodTypeAny[]],
+    string
+  > & {
+    options: Iterable<z.ZodTypeAny>;
+    _def: {
+      discriminator: string;
+      optionsMap?: Map<unknown, z.ZodTypeAny>;
+    };
+  };
+
+  const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+    typeof value === "object" && value !== null && !Array.isArray(value);
+
+  const extractLiteralValue = (schema: $ZodType | undefined): unknown => {
+    const literalDef = schema?._zod?.def;
+    if (!isPlainObject(literalDef) || literalDef.type !== "literal") {
+      return undefined;
+    }
+    if ("value" in literalDef) {
+      return literalDef.value;
+    }
+    if ("values" in literalDef && Array.isArray(literalDef.values)) {
+      return literalDef.values[0];
+    }
+    return undefined;
+  };
 
   function flatten(subSchema: $ZodType, subValue: unknown, prefix = ""): void {
     let currentSubSchema = subSchema;
@@ -74,26 +103,45 @@ export function flattenZodFormData<T extends $ZodType>(
       return;
     }
 
-    // Handle discriminated unions first regardless of def.type string
     if (currentSubSchema instanceof z.ZodDiscriminatedUnion) {
-      const discriminator = (currentSubSchema as any)._def?.discriminator ?? (currentSubSchema as any).discriminator;
+      const discriminated = currentSubSchema as DiscriminatedUnionInternal;
+      const { discriminator, optionsMap } = discriminated._def;
       const discPath = prefix ? `${prefix}.${discriminator}` : discriminator;
-      const discValue = (subValue as any)?.[discriminator];
+      const discValue = isPlainObject(subValue)
+        ? subValue[discriminator]
+        : undefined;
+
       flattenedDataMap.set(discPath, discValue);
 
-      // Try to flatten only the selected option under the same prefix
-      const selectedOption = (currentSubSchema.options as any[]).find((opt: any) => {
-        const lit = (opt.shape?.[discriminator] as any)?.value ?? (opt._def?.shape?.[discriminator]?._def?.value);
-        return lit === discValue;
-      });
-      if (selectedOption && typeof subValue === "object" && subValue !== null) {
-        if (selectedOption instanceof z.ZodObject) {
-          for (const [key, value] of Object.entries(selectedOption.shape)) {
-            if (key === discriminator) continue;
-            const newPrefix = prefix ? `${prefix}.${key}` : key;
-            flatten(value as z.ZodType, (subValue as any)[key], newPrefix);
+      const resolveOption = (): z.ZodTypeAny | undefined => {
+        if (discValue === undefined) return undefined;
+        if (optionsMap) {
+          const direct = optionsMap.get(discValue);
+          if (direct) return direct;
+        }
+
+        for (const candidate of discriminated.options) {
+          if (candidate instanceof z.ZodObject) {
+            const fieldSchema = candidate.shape[discriminator] as
+              | $ZodType
+              | undefined;
+            if (extractLiteralValue(fieldSchema) === discValue) {
+              return candidate;
+            }
           }
-          return;
+        }
+
+        return undefined;
+      };
+
+      const selectedOption = resolveOption();
+      if (selectedOption instanceof z.ZodObject && isPlainObject(subValue)) {
+        const shape = selectedOption.shape;
+        for (const key of Object.keys(shape)) {
+          if (key === discriminator) continue;
+          const fieldSchema = shape[key] as $ZodType;
+          const newPrefix = prefix ? `${prefix}.${key}` : key;
+          flatten(fieldSchema, subValue[key], newPrefix);
         }
       }
       return;
@@ -326,5 +374,5 @@ export function flattenZodFormData<T extends $ZodType>(
   }
 
   flatten(schema, data);
-  return Object.fromEntries(flattenedDataMap);
+  return Object.fromEntries(flattenedDataMap) as FlattenedFormData<T>;
 }

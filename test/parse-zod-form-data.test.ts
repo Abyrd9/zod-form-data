@@ -1,8 +1,8 @@
 import { describe, expect, test } from "vitest";
 import { z } from "zod/v4";
-import { parseZodFormData } from "../src/parse-zod-form-data";
+import { parseFormData } from "../src";
 
-describe("parseZodFormData", () => {
+describe("parseFormData", () => {
   test("parses basic form data", () => {
     const schema = z.object({
       name: z.string(),
@@ -13,13 +13,11 @@ describe("parseZodFormData", () => {
     formData.append("name", "John");
     formData.append("age", "30");
 
-    const result = parseZodFormData(formData, { schema });
+    const result = parseFormData(formData, { schema });
     expect(result).toEqual({
       success: true,
-      data: {
-        name: "John",
-        age: 30,
-      },
+      data: { name: "John", age: 30 },
+      errors: null,
     });
   });
 
@@ -33,12 +31,21 @@ describe("parseZodFormData", () => {
     formData.append("email", "invalid-email");
     formData.append("age", "16");
 
-    const result = parseZodFormData(formData, { schema });
+    const result = parseFormData(formData, { schema });
     expect(result).toEqual({
       success: false,
+      data: null,
       errors: {
-        age: "Too small: expected number to be >=18",
-        email: "Invalid email address",
+        form: undefined,
+        global: undefined,
+        fields: {
+          age: "Too small: expected number to be >=18",
+          email: "Invalid email address",
+        },
+        flattened: {
+          age: "Too small: expected number to be >=18",
+          email: "Invalid email address",
+        },
       },
     });
   });
@@ -59,7 +66,7 @@ describe("parseZodFormData", () => {
     formData.append("user.address.street", "123 Main St");
     formData.append("user.address.city", "Boston");
 
-    const result = parseZodFormData(formData, { schema });
+    const result = parseFormData(formData, { schema });
     expect(result).toEqual({
       success: true,
       data: {
@@ -68,6 +75,7 @@ describe("parseZodFormData", () => {
           address: { street: "123 Main St", city: "Boston" },
         },
       },
+      errors: null,
     });
   });
 
@@ -90,7 +98,7 @@ describe("parseZodFormData", () => {
     formData.append("users.1.name", "Jane");
     formData.append("users.1.age", "25");
 
-    const result = parseZodFormData(formData, { schema });
+    const result = parseFormData(formData, { schema });
     expect(result).toEqual({
       success: true,
       data: {
@@ -100,6 +108,7 @@ describe("parseZodFormData", () => {
           { name: "Jane", age: 25 },
         ],
       },
+      errors: null,
     });
   });
 
@@ -115,13 +124,14 @@ describe("parseZodFormData", () => {
     formData.append("settings.timeout", "5000");
     formData.append("settings.limit", "100");
 
-    const result = parseZodFormData(formData, { schema });
+    const result = parseFormData(formData, { schema });
     expect(result).toEqual({
       success: true,
       data: {
         metadata: { key1: "value1", key2: "value2" },
         settings: { timeout: 5000, limit: 100 },
       },
+      errors: null,
     });
   });
 
@@ -141,13 +151,14 @@ describe("parseZodFormData", () => {
     formData.append("name", "John");
     formData.append("address.street", "123 Main St");
 
-    const result = parseZodFormData(formData, { schema });
+    const result = parseFormData(formData, { schema });
     expect(result).toEqual({
       success: true,
       data: {
         name: "John",
         address: { street: "123 Main St" },
       },
+      errors: null,
     });
   });
 
@@ -160,11 +171,19 @@ describe("parseZodFormData", () => {
     const formData = new FormData();
     formData.append("name", "John");
 
-    const result = parseZodFormData(formData, { schema });
+    const result = parseFormData(formData, { schema });
     expect(result).toEqual({
       success: false,
+      data: null,
       errors: {
-        email: "Invalid input: expected string, received undefined",
+        form: undefined,
+        global: undefined,
+        fields: {
+          email: "Invalid input: expected string, received undefined",
+        },
+        flattened: {
+          email: "Invalid input: expected string, received undefined",
+        },
       },
     });
   });
@@ -184,10 +203,16 @@ describe("parseZodFormData", () => {
     formData.append("password", "secret123");
     formData.append("confirmPassword", "secret124");
 
-    const result = parseZodFormData(formData, { schema });
+    const result = parseFormData(formData, { schema });
     expect(result).toEqual({
       success: false,
-      errors: { confirmPassword: "Passwords don't match" },
+      data: null,
+      errors: {
+        form: undefined,
+        global: undefined,
+        fields: { confirmPassword: "Passwords don't match" },
+        flattened: { confirmPassword: "Passwords don't match" },
+      },
     });
   });
 
@@ -199,8 +224,12 @@ describe("parseZodFormData", () => {
     formData.append("coords.0", "40.7128");
     formData.append("coords.1", "-74.006");
 
-    const result = parseZodFormData(formData, { schema });
-    expect(result).toEqual({ success: true, data: { coords: [40.7128, -74.006] } });
+    const result = parseFormData(formData, { schema });
+    expect(result).toEqual({
+      success: true,
+      data: { coords: [40.7128, -74.006] },
+      errors: null,
+    });
   });
 
   // NEW: map and set are not directly representable with FormData; verify graceful handling
@@ -216,13 +245,14 @@ describe("parseZodFormData", () => {
     formData.append("labels.0", "x");
     formData.append("labels.1", "y");
 
-    const result = parseZodFormData(formData, { schema });
+    const result = parseFormData(formData, { schema });
     expect(result).toEqual({
       success: true,
       data: {
         scores: { math: 95, science: 90 },
         labels: ["x", "y"],
       },
+      errors: null,
     });
   });
 
@@ -231,18 +261,30 @@ describe("parseZodFormData", () => {
     const schema = z.object({ agree: z.boolean() });
     const formData = new FormData();
     formData.append("agree", "on");
-    const result = parseZodFormData(formData, { schema });
-    expect(result).toEqual({ success: true, data: { agree: true } });
+    const result = parseFormData(formData, { schema });
+    expect(result).toEqual({
+      success: true,
+      data: { agree: true },
+      errors: null,
+    });
   });
 
   test("invalid boolean string yields error", () => {
     const schema = z.object({ agree: z.boolean() });
     const formData = new FormData();
     formData.append("agree", "yes");
-    const result = parseZodFormData(formData, { schema });
+    const result = parseFormData(formData, { schema });
     expect(result).toEqual({
       success: false,
-      errors: { agree: 'Invalid input: expected boolean, received string' },
+      data: null,
+      errors: {
+        form: undefined,
+        global: undefined,
+        fields: { agree: "Invalid input: expected boolean, received string" },
+        flattened: {
+          agree: "Invalid input: expected boolean, received string",
+        },
+      },
     });
   });
 
@@ -251,8 +293,12 @@ describe("parseZodFormData", () => {
     const schema = z.object({ middle: z.string().nullable() });
     const formData = new FormData();
     formData.append("middle", "");
-    const result = parseZodFormData(formData, { schema });
-    expect(result).toEqual({ success: true, data: { middle: null } });
+    const result = parseFormData(formData, { schema });
+    expect(result).toEqual({
+      success: true,
+      data: { middle: null },
+      errors: null,
+    });
   });
 
   // NEW: union leaf coercion
@@ -260,15 +306,23 @@ describe("parseZodFormData", () => {
     const schema = z.object({ value: z.union([z.number(), z.string()]) });
     const formData = new FormData();
     formData.append("value", "42");
-    const result = parseZodFormData(formData, { schema });
-    expect(result).toEqual({ success: true, data: { value: 42 } });
+    const result = parseFormData(formData, { schema });
+    expect(result).toEqual({
+      success: true,
+      data: { value: 42 },
+      errors: null,
+    });
   });
 
   test("falls back to string for union leaf when not a number", () => {
     const schema = z.object({ value: z.union([z.number(), z.string()]) });
     const formData = new FormData();
     formData.append("value", "hello");
-    const result = parseZodFormData(formData, { schema });
-    expect(result).toEqual({ success: true, data: { value: "hello" } });
+    const result = parseFormData(formData, { schema });
+    expect(result).toEqual({
+      success: true,
+      data: { value: "hello" },
+      errors: null,
+    });
   });
 });

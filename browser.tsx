@@ -1,6 +1,5 @@
 import React, { useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
-import { useZodForm } from './index';
 import { z } from 'zod/v4';
 
 // Example form component for debugging
@@ -91,10 +90,6 @@ function TestForm() {
 
     // lazy recursive
     tree: Tree,
-  });
-
-  const { fields, getFieldArrayHelpers, setFieldErrors } = useZodForm({
-    schema: Content,
   });
 
   return null;

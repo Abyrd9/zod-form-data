@@ -1,9 +1,10 @@
 import type { z } from "zod/v4";
 import type { DeepPartial } from "./deep-partial";
+import type { FlattenedFormData } from "./schema-paths";
 import { $ZodType } from "zod/v4/core";
 
 export function unflattenZodFormData<T extends $ZodType>(
-  data: Record<string, unknown>,
+  data: FlattenedFormData<T>,
   root?: string
 ): DeepPartial<z.infer<T>> {
   const result: Record<string, unknown> = {};
@@ -108,7 +109,7 @@ export function unflattenZodFormData<T extends $ZodType>(
     }
   };
 
-  for (const [key, value] of Object.entries(data)) {
+  for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
     const keys = key.split(".");
 
     // Check if a root is provided and if the current key starts with it

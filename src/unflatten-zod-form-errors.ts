@@ -1,9 +1,10 @@
 import type { NestedFieldErrors } from "./flatten-zod-form-errors";
 import type { DeepPartial } from "./deep-partial";
+import type { FlattenedFormErrors } from "./schema-paths";
 import type { $ZodType } from "zod/v4/core";
 
 export function unflattenZodFormErrors<T extends $ZodType>(
-  errors: Record<string, string>,
+  errors: FlattenedFormErrors<T>,
   root?: string
 ): DeepPartial<NestedFieldErrors<T>> {
   const result: Record<string, unknown> = {};
@@ -108,7 +109,7 @@ export function unflattenZodFormErrors<T extends $ZodType>(
     }
   };
 
-  for (const [key, value] of Object.entries(errors)) {
+  for (const [key, value] of Object.entries(errors as Record<string, string>)) {
     const keys = key.split(".");
 
     // Check if a root is provided and if the current key starts with it

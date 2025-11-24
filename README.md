@@ -1,24 +1,28 @@
 # zod-form-data
 
-Type-safe utilities for building forms with Zod v4 schemas. Parse, flatten, and manage form data and errors while preserving schema intent. Includes a React hook for ergonomic field access and array helpers.
+Type-safe FormData helpers for Zod v4 schemas. Convert objects to `FormData`, recover nested data from `FormData`, and validate either representation while keeping the schema’s type inference intact.
 
-## Highlights
-- Works with Zod v4 types (objects, arrays, tuples, unions, discriminated unions, records, maps, sets, lazy, optional, default, nullable)
-- Parse from FormData and plain data with coercion (string → number/boolean/date, tuple elements, union options)
-- Flatten/unflatten data and error structures using predictable dotted paths
-- React hook `useZodForm` for field props and array helpers
-- Strong TypeScript types for paths and element types (with unwrapping of optional/default/nullable)
-- Exhaustive test suite
+## What’s included
 
-## Install
-```bash
-bun install
-```
+| Function | Description |
+| --- | --- |
+| `convertObjectToFormData(schema, data)` | Flattens an object that conforms to `schema` into a `FormData` instance. Numbers, booleans, and dates are stringified; blobs pass through untouched. |
+| `convertFormDataToObject(schema, formData)` | Coerces a `FormData` instance back into a nested object using the schema’s field semantics. Arrays, records, unions, and discriminated unions are reconstructed automatically. |
+| `parseFormData(formData, { schema })` | Coerces and validates `FormData`, returning either `{ success: true, data }` or `{ success: false, data: null, errors }`. Failures include field-level errors plus optional `form`/`global` messages. |
+| `parseData(data, { schema })` | Validates plain JavaScript data against a schema, producing the same result envelope (with `form`/`global` error slots). |
+
+The internal conversion logic understands the full Zod v4 surface area: objects, arrays, tuples, unions, discriminated unions, records, maps, sets, optional/default/nullable wrappers, lazy schemas, and more.
 
 ## Quick start
+
 ```ts
-import { z } from 'zod/v4';
-import { useZodForm, parseZodFormData } from '@abyrd9/zod-form-data';
+import { z } from "zod/v4";
+import {
+  convertObjectToFormData,
+  convertFormDataToObject,
+  parseFormData,
+  parseData,
+} from "@abyrd9/zod-form-data";
 
 const schema = z.object({
   user: z.object({
@@ -26,85 +30,57 @@ const schema = z.object({
     age: z.number().optional(),
   }),
   tags: z.array(z.string()).default([]),
-  mode: z.union([z.literal('light'), z.literal('dark')])
 });
 
-// Parse from FormData
-const formData = new FormData();
-formData.append('user.name', 'Jane');
-formData.append('user.age', '30');
-formData.append('tags.0', 'typescript');
-formData.append('mode', 'dark');
+// Object -> FormData
+const formData = convertObjectToFormData(schema, {
+  user: { name: "Ada", age: 37 },
+  tags: ["zod", "forms"],
+});
+formData.get("user.age"); // "37"
 
-const parsed = parseZodFormData(formData, { schema });
-// { success: true, data: { user: { name: 'Jane', age: 30 }, tags: ['typescript'], mode: 'dark' } }
+// FormData -> object
+const restored = convertFormDataToObject(schema, formData);
+// => { user: { name: "Ada", age: 37 }, tags: ["zod", "forms"] }
 
-// React usage
-function Form() {
-  const { fields, getFieldArrayHelpers, setFieldErrors } = useZodForm({ schema });
+// Parse with validation
+const result = parseFormData(formData, { schema });
+if (result.success) {
+  // result.data is typed as z.infer<typeof schema>
+} else {
+  // result.errors.fields contains nested field errors
+  // result.errors.flattened contains dotted-path errors
+  // result.errors.form / result.errors.global are optional high-level slots
+}
 
-  // Example array helpers
-  const tagsHelpers = getFieldArrayHelpers('tags');
-  // tagsHelpers.add('new-tag');
+// Parse plain objects
+const fromData = parseData(restored, { schema });
+```
 
-  // fields.user.name.value, fields.user.name.error, fields.user.name.onChange(...)
-  return null;
+## Parse error shape
+
+When parsing fails, both `parseFormData` and `parseData` return:
+
+```ts
+{
+  success: false,
+  data: null,
+  errors: {
+    form?: string;
+    global?: string;
+    fields: DeepPartial<NestedFieldErrors<Schema>>;
+    flattened: FlattenedFormErrors<Schema> & {
+      form?: string;
+      global?: string;
+    };
+  };
 }
 ```
 
-## Core API
-
-### parseZodFormData(formData, { schema })
-- Coerces types using schema (numbers, booleans, dates, tuples, unions)
-- Returns `{ success: true, data }` or `{ success: false, errors }`
-- Error paths follow dotted keys (e.g., `user.address.city`)
-
-### parseZodData(data, { schema })
-- Validates plain JS objects against the schema (no coercion from strings)
-- Same return shape as `parseZodFormData`
-
-### flattenZodFormSchema(schema)
-- Produces a flat Zod object keyed by dotted paths
-- Arrays use `#` placeholder (e.g., `tags.#`)
-- Records use `*` placeholder (e.g., `metadata.*`)
-- Tuples use `#` for element coercion (e.g., `coords.#`)
-- Discriminated unions add the discriminator path (e.g., `data.type`)
-
-### flattenZodFormData(schema, data)
-- Flattens nested JS data using schema semantics
-- Keys like `user.name`, `users.0.age`
-
-### unflattenZodFormData(flat)
-- Reconstructs nested data from flattened keys
-
-### flattenZodFormErrors(errors)
-- Flattens nested error objects to a `Map<string, string>` of dotted paths
-
-### useZodForm({ schema, defaultValues?, errors? })
-- Returns:
-  - `fields`: nested structure of field props `{ name, value, onChange, error }`
-  - `getFieldArrayHelpers(path)`: `{ add(value), remove(index) }`
-  - `setFieldErrors(errors)`
-- Strongly typed paths and element types for arrays; unwraps optional/default/nullable wrappers
-
-## Path semantics
-- Objects: `user.name`
-- Arrays: `tags.0`, helpers use `'tags'`
-- Records: `metadata.key`
-- Tuples: `coords.0`, `coords.1` (coercion via `coords.#`)
-- Discriminated union: `data.type`, plus option-specific keys
-
-## Examples
-- Boolean coercion: `"true" | "false" | "on"` → boolean
-- Nullable empty string: `""` → `null` for `z.string().nullable()`
-- Union leaf coercion: `z.union([z.number(), z.string()])` coerces numeric strings to numbers
+Use `errors.form` for form-level messages, `errors.global` for non-field errors (e.g. server failures), `errors.fields` for nested structures, and `errors.flattened` when you need dotted-path keys.
 
 ## Development
+
 ```bash
-# Browser dev
-bun run dev
-# Tests
 bun test
-# Build
-bun run build
 ```

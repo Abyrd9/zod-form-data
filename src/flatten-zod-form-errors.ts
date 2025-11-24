@@ -1,5 +1,6 @@
 import { $ZodType } from "zod/v4/core";
 import type { DeepPartial } from "./deep-partial";
+import type { FlattenedFormErrors } from "./schema-paths";
 
 export type NestedFieldErrors<T extends $ZodType> = T extends { _zod: { def: { type: "object"; shape: infer Shape } } }
     ? { [K in keyof Shape]: NestedFieldErrors<Shape[K] & $ZodType> }
@@ -51,26 +52,25 @@ export type NestedFieldErrors<T extends $ZodType> = T extends { _zod: { def: { t
 
 export function flattenZodFormErrors<T extends $ZodType>(
   errors?: DeepPartial<NestedFieldErrors<T>> | null
-) {
-  if (!errors) return new Map<string, string>();
+): FlattenedFormErrors<T> {
+  if (!errors) return {};
 
-  const flattenedErrorsMap = new Map<string, string>();
+  const flattenedErrors: Record<string, string> = {};
 
-  // Flatten object errors
-  function flatten(subErrors: Record<string, unknown>, prefix = "") {
+  function flatten(subErrors: Record<string, unknown>, prefix = ""): void {
     for (const [key, value] of Object.entries(subErrors)) {
       const newPrefix = prefix ? `${prefix}.${key}` : key;
       if (typeof value === "string") {
-        flattenedErrorsMap.set(newPrefix, value);
+        flattenedErrors[newPrefix] = value;
       } else if (Array.isArray(value)) {
         value.forEach((item, index) => {
           if (typeof item === "string") {
-            flattenedErrorsMap.set(`${newPrefix}.${index}`, item);
-          } else {
+            flattenedErrors[`${newPrefix}.${index}`] = item;
+          } else if (item && typeof item === "object") {
             flatten(item as Record<string, unknown>, `${newPrefix}.${index}`);
           }
         });
-      } else if (typeof value === "object" && value !== null) {
+      } else if (value && typeof value === "object") {
         flatten(value as Record<string, unknown>, newPrefix);
       }
     }
@@ -78,5 +78,5 @@ export function flattenZodFormErrors<T extends $ZodType>(
 
   flatten(errors as unknown as Record<string, unknown>);
 
-  return flattenedErrorsMap;
+  return flattenedErrors as FlattenedFormErrors<T>;
 }
