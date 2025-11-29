@@ -1,12 +1,11 @@
-import type { z } from "zod/v4";
+import type * as z4 from "zod/v4/core";
 import type { DeepPartial } from "./deep-partial";
 import type { FlattenedFormData } from "./schema-paths";
-import { $ZodType } from "zod/v4/core";
 
-export function unflattenZodFormData<T extends $ZodType>(
+export function unflattenZodFormData<T extends z4.$ZodType>(
   data: FlattenedFormData<T>,
   root?: string
-): DeepPartial<z.infer<T>> {
+): DeepPartial<z4.output<T>> {
   const result: Record<string, unknown> = {};
 
   const nest = (
@@ -124,6 +123,6 @@ export function unflattenZodFormData<T extends $ZodType>(
   }
 
   return root
-    ? (result[root] as DeepPartial<z.infer<T>>)
-    : (result as DeepPartial<z.infer<T>>);
+    ? (result[root] as DeepPartial<z4.output<T>>)
+    : (result as DeepPartial<z4.output<T>>);
 }

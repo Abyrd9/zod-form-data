@@ -9,10 +9,9 @@
 
     // Build configuration
     "moduleResolution": "bundler",
-    "types": ["bun-types"],
     "esModuleInterop": true,
     "declaration": true,
-    "declarationMap": false,
+    "declarationMap": true,
     "sourceMap": false,
     "outDir": "./dist",
     "emitDeclarationOnly": false,

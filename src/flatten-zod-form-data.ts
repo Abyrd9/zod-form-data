@@ -1,7 +1,7 @@
+import * as z4 from "zod/v4/core";
 import { z } from "zod/v4";
 import type { DeepPartial } from "./deep-partial";
 import type { FlattenedFormData } from "./schema-paths";
-import { $ZodType } from "zod/v4/core";
 
 /**
  * Flattens nested form data based on a Zod v4 schema into a flat key-value map.
@@ -62,9 +62,9 @@ import { $ZodType } from "zod/v4/core";
  * // }
  * ```
  */
-export function flattenZodFormData<T extends $ZodType>(
+export function flattenZodFormData<T extends z4.$ZodType>(
   schema: T,
-  data: DeepPartial<z.infer<T>>
+  data: DeepPartial<z4.output<T>>
 ): FlattenedFormData<T> {
   const flattenedDataMap = new Map<string, unknown>();
 
@@ -82,7 +82,7 @@ export function flattenZodFormData<T extends $ZodType>(
   const isPlainObject = (value: unknown): value is Record<string, unknown> =>
     typeof value === "object" && value !== null && !Array.isArray(value);
 
-  const extractLiteralValue = (schema: $ZodType | undefined): unknown => {
+  const extractLiteralValue = (schema: z4.$ZodType | undefined): unknown => {
     const literalDef = schema?._zod?.def;
     if (!isPlainObject(literalDef) || literalDef.type !== "literal") {
       return undefined;
@@ -96,8 +96,8 @@ export function flattenZodFormData<T extends $ZodType>(
     return undefined;
   };
 
-  function flatten(subSchema: $ZodType, subValue: unknown, prefix = ""): void {
-    let currentSubSchema = subSchema;
+  function flatten(subSchema: z4.$ZodType, subValue: unknown, prefix = ""): void {
+    const currentSubSchema = subSchema;
 
     if (!currentSubSchema?._zod) {
       return;
@@ -113,7 +113,7 @@ export function flattenZodFormData<T extends $ZodType>(
 
       flattenedDataMap.set(discPath, discValue);
 
-      const resolveOption = (): z.ZodTypeAny | undefined => {
+      const resolveOption = (): z4.$ZodType | undefined => {
         if (discValue === undefined) return undefined;
         if (optionsMap) {
           const direct = optionsMap.get(discValue);
@@ -123,7 +123,7 @@ export function flattenZodFormData<T extends $ZodType>(
         for (const candidate of discriminated.options) {
           if (candidate instanceof z.ZodObject) {
             const fieldSchema = candidate.shape[discriminator] as
-              | $ZodType
+              | z4.$ZodType
               | undefined;
             if (extractLiteralValue(fieldSchema) === discValue) {
               return candidate;
@@ -139,7 +139,7 @@ export function flattenZodFormData<T extends $ZodType>(
         const shape = selectedOption.shape;
         for (const key of Object.keys(shape)) {
           if (key === discriminator) continue;
-          const fieldSchema = shape[key] as $ZodType;
+          const fieldSchema = shape[key] as z4.$ZodType;
           const newPrefix = prefix ? `${prefix}.${key}` : key;
           flatten(fieldSchema, subValue[key], newPrefix);
         }
@@ -220,7 +220,7 @@ export function flattenZodFormData<T extends $ZodType>(
             for (const [key, value] of Object.entries(
               subValue as Record<string, unknown>
             )) {
-              const newSubSchema = currentSubSchema.valueType as $ZodType;
+              const newSubSchema = currentSubSchema.valueType as z4.$ZodType;
               const newSubValue = (subValue as Record<string, unknown>)[key];
               const newPrefix = `${prefix}.${key}`;
 
@@ -235,7 +235,7 @@ export function flattenZodFormData<T extends $ZodType>(
         if (currentSubSchema instanceof z.ZodMap) {
           if (subValue instanceof Map) {
             for (const [key, value] of subValue.entries()) {
-              const newSubSchema = currentSubSchema.valueType as $ZodType;
+              const newSubSchema = currentSubSchema.valueType as z4.$ZodType;
               const newPrefix = `${prefix}.${String(key)}`;
               flatten(newSubSchema, value, newPrefix);
             }
@@ -249,7 +249,7 @@ export function flattenZodFormData<T extends $ZodType>(
           if (subValue instanceof Set) {
             let index = 0;
             for (const value of subValue) {
-              const newSubSchema = currentSubSchema.def.valueType as $ZodType;
+              const newSubSchema = currentSubSchema.def.valueType as z4.$ZodType;
               const newPrefix = `${prefix}.${index}`;
               flatten(newSubSchema, value, newPrefix);
               index++;
@@ -264,7 +264,7 @@ export function flattenZodFormData<T extends $ZodType>(
           if (Array.isArray(subValue)) {
             const items = currentSubSchema.def.items;
             for (let i = 0; i < items?.length; i++) {
-              const itemSchema = items[i] as $ZodType;
+              const itemSchema = items[i] as z4.$ZodType;
               const itemValue = subValue[i];
               const newPrefix = `${prefix}.${i}`;
               flatten(itemSchema, itemValue, newPrefix);

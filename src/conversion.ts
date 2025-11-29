@@ -1,3 +1,4 @@
+import * as z4 from "zod/v4/core";
 import { z } from "zod/v4";
 import type { DeepPartial } from "./deep-partial";
 import { flattenZodFormData } from "./flatten-zod-form-data";
@@ -5,7 +6,6 @@ import { flattenZodFormSchema } from "./flatten-zod-form-schema";
 import type { FlattenedFormData } from "./schema-paths";
 import { unflattenZodFormData } from "./unflatten-zod-form-data";
 import { coerceFormData } from "./coerce-form-data";
-import type { $ZodType } from "zod/v4/core";
 
 const toFormDataValue = (value: unknown): string | Blob | null => {
   if (value === undefined) return null;
@@ -19,7 +19,7 @@ const toFormDataValue = (value: unknown): string | Blob | null => {
   return JSON.stringify(value);
 };
 
-const unwrapSchema = (schema: z.ZodTypeAny): z.ZodTypeAny => {
+const unwrapSchema = (schema: z4.$ZodType): z4.$ZodType => {
   if (schema instanceof z.ZodOptional || schema instanceof z.ZodNullable) {
     return unwrapSchema(schema.unwrap());
   }
@@ -29,9 +29,9 @@ const unwrapSchema = (schema: z.ZodTypeAny): z.ZodTypeAny => {
   return schema;
 };
 
-export const convertObjectToFormData = <Schema extends $ZodType>(
+export const convertObjectToFormData = <Schema extends z4.$ZodType>(
   schema: Schema,
-  data: DeepPartial<z.infer<Schema>>,
+  data: DeepPartial<z4.output<Schema>>,
   formData: FormData = new FormData()
 ): FormData => {
   const flattened = flattenZodFormData(schema, data);
@@ -44,10 +44,10 @@ export const convertObjectToFormData = <Schema extends $ZodType>(
   return formData;
 };
 
-export const convertFormDataToObject = <Schema extends $ZodType>(
+export const convertFormDataToObject = <Schema extends z4.$ZodType>(
   schema: Schema,
   form: FormData
-): DeepPartial<z.infer<Schema>> => {
+): DeepPartial<z4.output<Schema>> => {
   const result: Record<string, unknown> = {};
   const flattenedSchema = flattenZodFormSchema(schema);
 
@@ -81,7 +81,7 @@ export const convertFormDataToObject = <Schema extends $ZodType>(
     }
 
     try {
-      result[key] = coerceFormData(matchingSchema).parse(formDataValue);
+      result[key] = coerceFormData(matchingSchema as z.ZodType).parse(formDataValue);
     } catch {
       result[key] = formDataValue;
     }

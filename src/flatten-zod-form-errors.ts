@@ -1,56 +1,48 @@
-import { $ZodType } from "zod/v4/core";
+import type * as z4 from "zod/v4/core";
 import type { DeepPartial } from "./deep-partial";
 import type { FlattenedFormErrors } from "./schema-paths";
 
-export type NestedFieldErrors<T extends $ZodType> = T extends { _zod: { def: { type: "object"; shape: infer Shape } } }
-    ? { [K in keyof Shape]: NestedFieldErrors<Shape[K] & $ZodType> }
-    : T extends { _zod: { def: { type: "record"; valueType: infer Value } } }
-    ? Record<string, NestedFieldErrors<Value & $ZodType>>
-    : T extends { _zod: { def: { type: "map"; valueType: infer Value } } }
-    ? Map<string, NestedFieldErrors<Value & $ZodType>>
-    : T extends { _zod: { def: { type: "array"; element: infer Item } } }
-    ? NestedFieldErrors<Item & $ZodType>[]
-    : T extends { _zod: { def: { type: "set"; element: infer Item } } }
-    ? Set<NestedFieldErrors<Item & $ZodType>>
-    : T extends { _zod: { def: { type: "tuple"; items: infer Items } } }
-    ? { [K in keyof Items]: NestedFieldErrors<Items[K] & $ZodType> }
-    : T extends { _zod: { def: { type: "optional"; innerType: infer Inner } } }
-    ? NestedFieldErrors<Inner & $ZodType>
-    : T extends { _zod: { def: { type: "default"; innerType: infer Inner } } }
-    ? NestedFieldErrors<Inner & $ZodType>
-    : T extends { _zod: { def: { type: "nullable"; innerType: infer Inner } } }
-    ? NestedFieldErrors<Inner & $ZodType>
-    : T extends { _zod: { def: { type: "union"; options: infer Options } } }
-    ? Options extends readonly $ZodType[]
-    ? NestedFieldErrors<Options[number] & $ZodType>
+export type NestedFieldErrors<T extends z4.$ZodType> = T extends z4.$ZodObject<infer Shape>
+    ? { [K in keyof Shape]: NestedFieldErrors<Shape[K] & z4.$ZodType> }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    : T extends z4.$ZodRecord<any, infer Value>
+    ? Record<string, NestedFieldErrors<Value & z4.$ZodType>>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    : T extends z4.$ZodMap<any, infer Value>
+    ? Map<string, NestedFieldErrors<Value & z4.$ZodType>>
+    : T extends z4.$ZodArray<infer Item>
+    ? NestedFieldErrors<Item & z4.$ZodType>[]
+    : T extends z4.$ZodSet<infer Item>
+    ? Set<NestedFieldErrors<Item & z4.$ZodType>>
+    : T extends z4.$ZodTuple<infer Items>
+    ? { [K in keyof Items]: NestedFieldErrors<Items[K] & z4.$ZodType> }
+    : T extends z4.$ZodOptional<infer Inner>
+    ? NestedFieldErrors<Inner & z4.$ZodType>
+    : T extends z4.$ZodDefault<infer Inner>
+    ? NestedFieldErrors<Inner & z4.$ZodType>
+    : T extends z4.$ZodNullable<infer Inner>
+    ? NestedFieldErrors<Inner & z4.$ZodType>
+    : T extends z4.$ZodUnion<infer Options>
+    ? Options extends readonly z4.$ZodType[]
+    ? NestedFieldErrors<Options[number] & z4.$ZodType>
     : string
-    : T extends { _zod: { def: { type: "intersection"; left: infer Left; right: infer Right } } }
-    ? NestedFieldErrors<Left & $ZodType> & NestedFieldErrors<Right & $ZodType>
-    : T extends { _zod: { def: { type: "lazy"; getter: () => infer LazyType } } }
-    ? LazyType extends $ZodType
+    : T extends z4.$ZodIntersection<infer Left, infer Right>
+    ? NestedFieldErrors<Left & z4.$ZodType> & NestedFieldErrors<Right & z4.$ZodType>
+    : T extends z4.$ZodLazy<infer LazyType>
+    ? LazyType extends z4.$ZodType
     ? NestedFieldErrors<LazyType>
     : string
-    : T extends { _zod: { def: { type: "transform"; input: infer Input; output: infer Output } } }
-    ? NestedFieldErrors<Input & $ZodType>
-    : T extends { _zod: { def: { type: "pipe"; input: infer Input; output: infer Output } } }
-    ? NestedFieldErrors<Input & $ZodType>
-    : T extends { _zod: { def: { type: "catch"; innerType: infer Inner } } }
-    ? NestedFieldErrors<Inner & $ZodType>
-    : T extends { _zod: { def: { type: "success"; data: infer Data } } }
-    ? string
-    : T extends { _zod: { def: { type: "literal"; value: infer Value } } }
-    ? string
-    : T extends { _zod: { def: { type: "enum"; values: infer Values } } }
-    ? string
-    : T extends { _zod: { def: { type: "promise"; unwrap: infer Unwrapped } } }
-    ? Unwrapped extends $ZodType
+    : T extends z4.$ZodPipe<infer Input, z4.$ZodType>
+    ? NestedFieldErrors<Input & z4.$ZodType>
+    : T extends z4.$ZodCatch<infer Inner>
+    ? NestedFieldErrors<Inner & z4.$ZodType>
+    : T extends z4.$ZodPromise<infer Unwrapped>
+    ? Unwrapped extends z4.$ZodType
     ? NestedFieldErrors<Unwrapped>
     : string
-    : T extends { _zod: { def: { type: "custom" } } }
-    ? string
     : string;
 
-export function flattenZodFormErrors<T extends $ZodType>(
+export function flattenZodFormErrors<T extends z4.$ZodType>(
   errors?: DeepPartial<NestedFieldErrors<T>> | null
 ): FlattenedFormErrors<T> {
   if (!errors) return {};

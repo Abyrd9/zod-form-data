@@ -1,11 +1,11 @@
-import { ZodError, z } from "zod/v4";
+import * as z4 from "zod/v4/core";
+import { z } from "zod/v4";
 import type { NestedFieldErrors } from "./flatten-zod-form-errors";
 import { coerceFormData } from "./coerce-form-data";
 import type { DeepPartial } from "./deep-partial";
 import { flattenZodFormSchema } from "./flatten-zod-form-schema";
 import { unflattenZodFormData } from "./unflatten-zod-form-data";
 import { unflattenZodFormErrors } from "./unflatten-zod-form-errors";
-import type { $ZodType } from "zod/v4/core";
 import type {
   FlattenedFormData,
   FlattenedFormErrors,
@@ -14,33 +14,33 @@ import type {
 
 type MetaKeys = "form" | "global";
 
-type FlattenedErrorsWithMeta<T extends $ZodType> = Partial<
+type FlattenedErrorsWithMeta<T extends z4.$ZodType> = Partial<
   Record<FlattenedPaths<T> | MetaKeys, string>
 >;
 
-export type ParseErrors<T extends $ZodType> = {
-	form?: string;
-	global?: string;
-	fields?: DeepPartial<NestedFieldErrors<T>>;
-	flattened?: FlattenedErrorsWithMeta<T>;
+export type ParseErrors<T extends z4.$ZodType> = {
+  form?: string;
+  global?: string;
+  fields?: DeepPartial<NestedFieldErrors<T>>;
+  flattened?: FlattenedErrorsWithMeta<T>;
 };
 
-export type ParseSuccess<T extends $ZodType> = {
-	success: true;
-	data: z.infer<T>;
-	errors?: undefined;
+export type ParseSuccess<T extends z4.$ZodType> = {
+  success: true;
+  data: z4.output<T>;
+  errors?: undefined;
 };
 
-export type ParseFailure<T extends $ZodType> = {
-	success: false;
-	data?: undefined;
-	errors: ParseErrors<T>;
+export type ParseFailure<T extends z4.$ZodType> = {
+  success: false;
+  data?: undefined;
+  errors: ParseErrors<T>;
 };
 
-export type ParseResult<T extends $ZodType> = ParseSuccess<T> | ParseFailure<T>;
+export type ParseResult<T extends z4.$ZodType> = ParseSuccess<T> | ParseFailure<T>;
 
-const collectFlattenedErrors = <Schema extends $ZodType>(
-  issues: ReadonlyArray<z.ZodIssue>
+const collectFlattenedErrors = <Schema extends z4.$ZodType>(
+  issues: ReadonlyArray<z4.$ZodIssue>
 ): FlattenedErrorsWithMeta<Schema> => {
   const flattened: FlattenedErrorsWithMeta<Schema> = {};
   for (const issue of issues) {
@@ -52,7 +52,7 @@ const collectFlattenedErrors = <Schema extends $ZodType>(
   return flattened;
 };
 
-const extractFieldErrors = <Schema extends $ZodType>(
+const extractFieldErrors = <Schema extends z4.$ZodType>(
   flattened: FlattenedErrorsWithMeta<Schema>
 ): FlattenedFormErrors<Schema> => {
   const entries = Object.entries(flattened).filter(
@@ -61,7 +61,7 @@ const extractFieldErrors = <Schema extends $ZodType>(
   return Object.fromEntries(entries) as FlattenedFormErrors<Schema>;
 };
 
-const buildErrorPayload = <Schema extends $ZodType>(
+const buildErrorPayload = <Schema extends z4.$ZodType>(
   flattened: FlattenedErrorsWithMeta<Schema>,
   overrides?: Partial<Pick<ParseErrors<Schema>, MetaKeys>>
 ): ParseErrors<Schema> => {
@@ -86,7 +86,7 @@ function matchWildcardString(pattern: string, key: string): boolean {
   });
 }
 
-export const parseFormData = <T extends $ZodType>(
+export const parseFormData = <T extends z4.$ZodType>(
   form: FormData,
   {
     schema,
@@ -133,7 +133,7 @@ export const parseFormData = <T extends $ZodType>(
           !(matchingSchema instanceof z.ZodDiscriminatedUnion);
 
         if (shouldRecordError) {
-          if (error instanceof ZodError) {
+          if (error instanceof z4.$ZodError) {
             let added = false;
             for (const zodError of error.issues) {
               const path = zodError.path.join(".");
@@ -161,8 +161,7 @@ export const parseFormData = <T extends $ZodType>(
   const flattenedData = result as FlattenedFormData<T>;
   const unflattenedData = unflattenZodFormData<T>(flattenedData);
 
-  // @ts-expect-error - schema is a Zod v4 schema
-  const validatedData = schema.safeParse(unflattenedData);
+  const validatedData = z4.safeParse(schema, unflattenedData);
 
   if (validatedData.success && Object.keys(coercionErrors).length === 0) {
     return {
@@ -184,12 +183,12 @@ export const parseFormData = <T extends $ZodType>(
   const mergedErrors: FlattenedErrorsWithMeta<T> = {
     ...coercionErrors,
     ...validationErrors,
-  };
+  } as FlattenedErrorsWithMeta<T>;
 
   if (Object.keys(mergedErrors).length === 0) {
     return {
       success: true,
-      data: validatedData.success ? validatedData.data : (unflattenedData as z.infer<T>),
+      data: validatedData.success ? validatedData.data : (unflattenedData as z4.output<T>),
     };
   }
 
@@ -199,7 +198,7 @@ export const parseFormData = <T extends $ZodType>(
   };
 };
 
-export const parseData = <T extends $ZodType>(
+export const parseData = <T extends z4.$ZodType>(
   data: unknown,
   {
     schema,
@@ -209,8 +208,7 @@ export const parseData = <T extends $ZodType>(
 ): ParseResult<T> => {
   try {
     // Use safeParse instead of parse to handle errors more gracefully
-    // @ts-expect-error - This is a schema
-    const validatedData = schema.safeParse(data);
+    const validatedData = z4.safeParse(schema, data);
 
     if (!validatedData.success) {
       const flattenedErrors = collectFlattenedErrors<T>(
@@ -230,7 +228,7 @@ export const parseData = <T extends $ZodType>(
       data: validatedData.data,
     };
   } catch (error) {
-    if (error instanceof ZodError) {
+    if (error instanceof z4.$ZodError) {
       const flattenedErrors = collectFlattenedErrors<T>(error.issues);
       return {
         success: false,

@@ -1,13 +1,13 @@
+import * as z4 from "zod/v4/core";
 import { z } from "zod/v4";
-import { $ZodType } from "zod/v4/core";
 
-export function flattenZodFormSchema<T extends $ZodType>(
+export function flattenZodFormSchema<T extends z4.$ZodType>(
   schema: T
 ): z.ZodObject<z.ZodRawShape> {
   const flattenedSchemaMap = new Map<string, z.ZodType>();
 
   function flatten(
-    subSchema: $ZodType,
+    subSchema: z4.$ZodType,
     prefix = "",
     options?: { isOptional?: boolean; lazyDepth?: number }
   ) {
@@ -46,12 +46,12 @@ export function flattenZodFormSchema<T extends $ZodType>(
 
     // Discriminated unions: include the discriminator path and flatten option fields
     if (currentSubSchema instanceof z.ZodDiscriminatedUnion) {
-      const discriminator = currentSubSchema._def.discriminator;
+      const discriminator = currentSubSchema._zod.def.discriminator;
       const discPath = prefix ? `${prefix}.${discriminator}` : discriminator;
       // The discriminator itself is a literal string; using z.string() matches tests
       flattenedSchemaMap.set(discPath, z.string());
       for (const option of currentSubSchema.options) {
-        flatten(option as z.ZodType, prefix, { isOptional, lazyDepth });
+        flatten(option as z4.$ZodType, prefix, { isOptional, lazyDepth });
       }
       return;
     }
