@@ -86,6 +86,14 @@ export function flattenZodFormSchema<T extends z4.$ZodType>(
       return;
     }
 
+    if (currentSubSchema instanceof z.ZodIntersection) {
+      const left = currentSubSchema.def.left;
+      const right = currentSubSchema.def.right;
+      flatten(left, prefix, { isOptional, lazyDepth });
+      flatten(right, prefix, { isOptional, lazyDepth });
+      return;
+    }
+
     // Leaf: store the schema at this path
     const leaf = subSchema as z.ZodType;
     const isCollectionElement = prefix.endsWith('.#') || prefix.endsWith('.*');
