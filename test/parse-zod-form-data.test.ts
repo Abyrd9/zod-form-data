@@ -208,6 +208,34 @@ describe("parseFormData", () => {
     });
   });
 
+  test("returns form errors for root-level refinements", () => {
+    const schema = z
+      .object({
+        password: z.string(),
+        confirmPassword: z.string(),
+      })
+      .refine((data) => data.password === data.confirmPassword, {
+        message: "Passwords don't match",
+      });
+
+    const formData = new FormData();
+    formData.append("password", "secret123");
+    formData.append("confirmPassword", "secret124");
+
+    const result = parseFormData(formData, { schema });
+    expect(result).toEqual({
+      success: false,
+      errors: {
+        form: "Passwords don't match",
+        global: undefined,
+        fields: {},
+        flattened: {
+          form: "Passwords don't match",
+        },
+      },
+    });
+  });
+
   // NEW: tuples via form fields
   test("handles tuples", () => {
     const schema = z.object({ coords: z.tuple([z.number(), z.number()]) });

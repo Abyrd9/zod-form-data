@@ -47,7 +47,10 @@ const collectFlattenedErrors = <Schema extends z4.$ZodType>(
     const path = issue.path.join(".");
     if (path) {
       flattened[path as FlattenedPaths<Schema>] = issue.message;
+      continue;
     }
+
+    flattened.form ??= issue.message;
   }
   return flattened;
 };
@@ -170,31 +173,17 @@ export const parseFormData = <T extends z4.$ZodType>(
     };
   }
 
-  const validationErrors: Record<string, string> = {};
-  if (!validatedData.success) {
-    for (const issue of validatedData.error.issues) {
-      const path = issue.path.join(".");
-      if (path) {
-        validationErrors[path] = issue.message;
-      }
-    }
-  }
-
-  const mergedErrors: FlattenedErrorsWithMeta<T> = {
-    ...coercionErrors,
-    ...validationErrors,
-  } as FlattenedErrorsWithMeta<T>;
-
-  if (Object.keys(mergedErrors).length === 0) {
-    return {
-      success: true,
-      data: validatedData.success ? validatedData.data : (unflattenedData as z4.output<T>),
-    };
-  }
-
   return {
     success: false,
-    errors: buildErrorPayload(mergedErrors, { form: undefined, global: undefined }),
+    errors: buildErrorPayload(
+      {
+        ...coercionErrors,
+        ...(!validatedData.success
+          ? collectFlattenedErrors<T>(validatedData.error.issues)
+          : {}),
+      } as FlattenedErrorsWithMeta<T>,
+      { form: undefined, global: undefined }
+    ),
   };
 };
 

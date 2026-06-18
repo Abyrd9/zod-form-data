@@ -205,6 +205,35 @@ describe("parseData", () => {
     });
   });
 
+  test("returns form errors for root-level refinements", () => {
+    const schema = z
+      .object({
+        password: z.string(),
+        confirmPassword: z.string(),
+      })
+      .refine((data) => data.password === data.confirmPassword, {
+        message: "Passwords don't match",
+      });
+
+    const data = {
+      password: "secret123",
+      confirmPassword: "secret124",
+    };
+
+    const result = parseData(data, { schema });
+    expect(result).toEqual({
+      success: false,
+      errors: {
+        form: "Passwords don't match",
+        global: undefined,
+        fields: {},
+        flattened: {
+          form: "Passwords don't match",
+        },
+      },
+    });
+  });
+
   // NEW: tuples
   test("handles tuples", () => {
     const schema = z.object({ coords: z.tuple([z.number(), z.number()]) });
