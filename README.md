@@ -8,7 +8,7 @@ Type-safe FormData helpers for Zod v4 schemas. Convert objects to `FormData`, re
 | --- | --- |
 | `convertObjectToFormData(schema, data)` | Flattens an object that conforms to `schema` into a `FormData` instance. Numbers, booleans, and dates are stringified; blobs pass through untouched. |
 | `convertFormDataToObject(schema, formData)` | Coerces a `FormData` instance back into a nested object using the schema’s field semantics. Arrays, records, unions, and discriminated unions are reconstructed automatically. |
-| `parseFormData(formData, { schema })` | Coerces and validates `FormData`, returning either `{ success: true, data }` or `{ success: false, data: null, errors }`. Failures include field-level errors plus optional `form`/`global` messages. |
+| `parseFormData(formData, { schema })` | Coerces and validates `FormData`, returning either `{ success: true, data }` or `{ success: false, errors }`. Failures include field-level errors plus optional `form`/`global` messages. |
 | `parseData(data, { schema })` | Validates plain JavaScript data against a schema, producing the same result envelope (with `form`/`global` error slots). |
 
 The internal conversion logic understands the full Zod v4 surface area: objects, arrays, tuples, unions, discriminated unions, records, maps, sets, optional/default/nullable wrappers, lazy schemas, and more.

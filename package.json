@@ -47,7 +47,7 @@
   "scripts": {
     "build": "bun run build:js && bun run build:types",
     "build:js": "bun build ./index.ts --outdir ./dist --target node --format esm",
-    "build:types": "bunx tsc --emitDeclarationOnly --declaration --outDir ./dist",
+    "build:types": "./node_modules/.bin/tsc --emitDeclarationOnly --declaration --outDir ./dist",
     "test": "bun test",
     "test:watch": "bun test --watch",
     "update": "npx npm-check-updates -u",
