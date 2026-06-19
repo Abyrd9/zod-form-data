@@ -234,7 +234,6 @@ describe("parseData", () => {
     });
   });
 
-  // NEW: tuples
   test("handles tuples", () => {
     const schema = z.object({ coords: z.tuple([z.number(), z.number()]) });
     const data = { coords: [40.7128, -74.006] as [number, number] };
@@ -245,7 +244,6 @@ describe("parseData", () => {
     });
   });
 
-  // NEW: map and set
   test("handles map and set", () => {
     const schema = z.object({
       scores: z.map(z.string(), z.number()),

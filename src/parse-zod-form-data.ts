@@ -195,39 +195,12 @@ export const parseData = <T extends z4.$ZodType>(
     schema: T;
   }
 ): ParseResult<T> => {
-  try {
-    // Use safeParse instead of parse to handle errors more gracefully
-    const validatedData = z4.safeParse(schema, data);
+  const validatedData = z4.safeParse(schema, data);
 
-    if (!validatedData.success) {
-      const flattenedErrors = collectFlattenedErrors<T>(
-        validatedData.error.issues
-      );
-      return {
-        success: false,
-        errors: buildErrorPayload(flattenedErrors, {
-          form: undefined,
-          global: undefined,
-        }),
-      };
-    }
-
-    return {
-      success: true,
-      data: validatedData.data,
-    };
-  } catch (error) {
-    if (error instanceof z4.$ZodError) {
-      const flattenedErrors = collectFlattenedErrors<T>(error.issues);
-      return {
-        success: false,
-        errors: buildErrorPayload(flattenedErrors, {
-          form: undefined,
-          global: undefined,
-        }),
-      };
-    }
-    const flattenedErrors: FlattenedErrorsWithMeta<T> = {};
+  if (!validatedData.success) {
+    const flattenedErrors = collectFlattenedErrors<T>(
+      validatedData.error.issues
+    );
     return {
       success: false,
       errors: buildErrorPayload(flattenedErrors, {
@@ -236,4 +209,9 @@ export const parseData = <T extends z4.$ZodType>(
       }),
     };
   }
+
+  return {
+    success: true,
+    data: validatedData.data,
+  };
 };

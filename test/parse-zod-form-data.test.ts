@@ -236,7 +236,6 @@ describe("parseFormData", () => {
     });
   });
 
-  // NEW: tuples via form fields
   test("handles tuples", () => {
     const schema = z.object({ coords: z.tuple([z.number(), z.number()]) });
 
@@ -251,7 +250,6 @@ describe("parseFormData", () => {
     });
   });
 
-  // NEW: map and set are not directly representable with FormData; verify graceful handling
   test("handles map and set like structures with record/array fallbacks", () => {
     const schema = z.object({
       scores: z.record(z.string(), z.number()),
@@ -274,7 +272,6 @@ describe("parseFormData", () => {
     });
   });
 
-  // NEW: boolean coercion
   test("coerces boolean strings", () => {
     const schema = z.object({ agree: z.boolean() });
     const formData = new FormData();
@@ -304,7 +301,6 @@ describe("parseFormData", () => {
     });
   });
 
-  // NEW: nullable empty string -> null
   test("maps empty string to null for nullable", () => {
     const schema = z.object({ middle: z.string().nullable() });
     const formData = new FormData();
@@ -316,7 +312,6 @@ describe("parseFormData", () => {
     });
   });
 
-  // NEW: union leaf coercion
   test("coerces union leaf to number when possible", () => {
     const schema = z.object({ value: z.union([z.number(), z.string()]) });
     const formData = new FormData();
