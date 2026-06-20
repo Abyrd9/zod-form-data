@@ -5,7 +5,11 @@ import { flattenZodFormData } from "./flatten-zod-form-data";
 import { flattenZodFormSchema } from "./flatten-zod-form-schema";
 import type { FlattenedFormData } from "./schema-paths";
 import { unflattenZodFormData } from "./unflatten-zod-form-data";
-import { coerceFormData } from "./coerce-form-data";
+import {
+  coerceFormData,
+  coerceNumberFormDataValue,
+  unwrapFormDataSchema,
+} from "./coerce-form-data";
 
 const toFormDataValue = (value: unknown): string | Blob | null => {
   if (value === undefined) return null;
@@ -17,16 +21,6 @@ const toFormDataValue = (value: unknown): string | Blob | null => {
     return String(value);
   }
   return JSON.stringify(value);
-};
-
-const unwrapSchema = (schema: z4.$ZodType): z4.$ZodType => {
-  if (schema instanceof z.ZodOptional || schema instanceof z.ZodNullable) {
-    return unwrapSchema(schema.unwrap());
-  }
-  if (schema instanceof z.ZodDefault) {
-    return unwrapSchema(schema.removeDefault());
-  }
-  return schema;
 };
 
 export const convertObjectToFormData = <Schema extends z4.$ZodType>(
@@ -72,16 +66,13 @@ export const convertFormDataToObject = <Schema extends z4.$ZodType>(
       continue;
     }
 
-    const effectiveSchema = unwrapSchema(matchingSchema);
-
-    if (effectiveSchema instanceof z.ZodNumber) {
-      const num = Number(formDataValue);
-      result[key] = Number.isNaN(num) ? formDataValue : num;
-      continue;
-    }
+    const effectiveSchema = unwrapFormDataSchema(matchingSchema);
 
     try {
-      result[key] = coerceFormData(matchingSchema as z.ZodType).parse(formDataValue);
+      result[key] =
+        effectiveSchema instanceof z.ZodNumber
+          ? coerceNumberFormDataValue(formDataValue)
+          : coerceFormData(matchingSchema as z.ZodType).parse(formDataValue);
     } catch {
       result[key] = formDataValue;
     }
@@ -89,4 +80,3 @@ export const convertFormDataToObject = <Schema extends z4.$ZodType>(
 
   return unflattenZodFormData<Schema>(result as FlattenedFormData<Schema>);
 };
-

@@ -213,6 +213,19 @@ describe("conversion helpers", () => {
       },
     });
   });
-});
 
+  test("convertFormDataToObject keeps blank required numbers as strings", () => {
+    const schema = z.object({
+      age: z.number(),
+    });
+
+    const formData = new FormData();
+    formData.append("age", "");
+
+    const result = convertFormDataToObject(schema, formData);
+    expect(result).toEqual({
+      age: "",
+    });
+  });
+});
 

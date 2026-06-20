@@ -1,7 +1,11 @@
 import * as z4 from "zod/v4/core";
 import { z } from "zod/v4";
 import type { NestedFieldErrors } from "./flatten-zod-form-errors";
-import { coerceFormData } from "./coerce-form-data";
+import {
+  coerceFormData,
+  coerceNumberFormDataValue,
+  unwrapFormDataSchema,
+} from "./coerce-form-data";
 import type { DeepPartial } from "./deep-partial";
 import { flattenZodFormSchema } from "./flatten-zod-form-schema";
 import { unflattenZodFormData } from "./unflatten-zod-form-data";
@@ -115,21 +119,15 @@ export const parseFormData = <T extends z4.$ZodType>(
       )?.[1];
 
     if (matchingSchema) {
+      const effectiveSchema = unwrapFormDataSchema(matchingSchema);
+
       try {
-        if (matchingSchema instanceof z.ZodNumber) {
-          const num = Number(formDataValue);
-          if (!Number.isNaN(num)) {
-            result[key] = num;
-          } else {
-            coercionErrors[key] = "Expected number, received string";
-            result[key] = formDataValue;
-          }
-        } else {
-          const coercedValue = coerceFormData(
-            matchingSchema as z.ZodType
-          ).parse(formDataValue);
-          result[key] = coercedValue;
-        }
+        const coercedValue =
+          effectiveSchema instanceof z.ZodNumber
+            ? coerceNumberFormDataValue(formDataValue)
+            : coerceFormData(matchingSchema as z.ZodType).parse(formDataValue);
+
+        result[key] = coercedValue;
       } catch (error) {
         const shouldRecordError =
           !(matchingSchema instanceof z.ZodUnion) &&

@@ -1,3 +1,4 @@
+import type * as z4 from "zod/v4/core";
 import { z } from "zod/v4";
 
 const BoolAsString = z
@@ -17,6 +18,30 @@ const NumAsString = z
   .string()
   .regex(/^-?\d*\.?\d+$/, "Must be a number string")
   .transform(Number);
+
+const hasNumberContent = (value: unknown) =>
+  typeof value !== "string" || value.trim() !== "";
+
+export const unwrapFormDataSchema = (schema: z4.$ZodType): z4.$ZodType => {
+  if (schema instanceof z.ZodOptional || schema instanceof z.ZodNullable) {
+    return unwrapFormDataSchema(schema.unwrap());
+  }
+
+  if (schema instanceof z.ZodDefault) {
+    return unwrapFormDataSchema(schema.removeDefault());
+  }
+
+  return schema;
+};
+
+export const coerceNumberFormDataValue = (value: unknown) => {
+  if (!hasNumberContent(value)) return NumAsString.parse(value);
+
+  const coerced = z.coerce.number().safeParse(value);
+  if (coerced.success) return coerced.data;
+
+  return NumAsString.parse(value);
+};
 
 const DateAsString = z
   .string()
@@ -45,14 +70,7 @@ export function coerceFormData<Schema extends z.ZodType>(
     case "number":
       schema = z
         .any()
-        .overwrite((value) => {
-          // First try to coerce to number
-          const coerced = z.coerce.number().safeParse(value);
-          if (coerced.success) return coerced.data;
-
-          // If that fails, try parsing as string
-          return NumAsString.parse(value);
-        })
+        .overwrite(coerceNumberFormDataValue)
         .pipe(type);
       break;
     case "boolean":

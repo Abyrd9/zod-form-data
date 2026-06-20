@@ -181,6 +181,30 @@ describe("parseFormData", () => {
     });
   });
 
+  test("does not coerce blank required numbers to zero", () => {
+    const schema = z.object({
+      age: z.number(),
+    });
+
+    const formData = new FormData();
+    formData.append("age", "");
+
+    const result = parseFormData(formData, { schema });
+    expect(result).toEqual({
+      success: false,
+      errors: {
+        form: undefined,
+        global: undefined,
+        fields: {
+          age: "Invalid input: expected number, received string",
+        },
+        flattened: {
+          age: "Invalid input: expected number, received string",
+        },
+      },
+    });
+  });
+
   test("handles refinements", () => {
     const schema = z
       .object({
