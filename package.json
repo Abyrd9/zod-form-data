@@ -45,9 +45,10 @@
     }
   },
   "scripts": {
-    "build": "bun run build:js && bun run build:types",
+    "build": "bun run build:js && bun run build:types && bun run build:verify",
     "build:js": "bun build ./index.ts --outdir ./dist --target node --format esm",
     "build:types": "./node_modules/.bin/tsc --emitDeclarationOnly --declaration --outDir ./dist",
+    "build:verify": "node --input-type=module -e \"await import('./dist/index.js')\"",
     "test": "bun test",
     "test:watch": "bun test --watch",
     "update": "npx npm-check-updates -u",
