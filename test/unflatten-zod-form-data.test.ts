@@ -143,6 +143,15 @@ describe("unflattenZodFormData", () => {
     });
   });
 
+  test("includes direct root values when a root is provided", () => {
+    const schema = z.object({
+      user: z.object({}),
+    });
+
+    const result = unflattenZodFormData<typeof schema>({ user: {} }, "user");
+    expect(result).toEqual({});
+  });
+
   test("handles empty objects", () => {
     const schema = z.object({
       user: z.object({
