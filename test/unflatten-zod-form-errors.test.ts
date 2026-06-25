@@ -122,6 +122,19 @@ describe("unflattenZodFormErrors", () => {
     });
   });
 
+  test("includes direct root values when a root is provided", () => {
+    const schema = z.object({
+      user: z.string(),
+    });
+
+    const result = unflattenZodFormErrors<typeof schema>(
+      { user: "User is required" },
+      "user"
+    );
+
+    expect(result).toBe("User is required");
+  });
+
   test.skip("does not handle nested array errors yet", () => {
     const schema = z.object({
       matrix: z.array(z.array(z.number())),
