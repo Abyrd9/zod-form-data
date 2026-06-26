@@ -8,6 +8,7 @@ import {
 } from "./coerce-form-data";
 import type { DeepPartial } from "./deep-partial";
 import { flattenZodFormSchema } from "./flatten-zod-form-schema";
+import { matchWildcardPath } from "./match-wildcard-path";
 import { unflattenZodFormData } from "./unflatten-zod-form-data";
 import { unflattenZodFormErrors } from "./unflatten-zod-form-errors";
 import type {
@@ -80,19 +81,6 @@ const buildErrorPayload = <Schema extends z4.$ZodType>(
   };
 };
 
-function matchWildcardString(pattern: string, key: string): boolean {
-  const patternParts = pattern.split(".");
-  const testParts = key.split(".");
-
-  if (patternParts.length !== testParts.length) {
-    return false;
-  }
-
-  return patternParts.every((part, index) => {
-    return part === "*" || part === testParts[index];
-  });
-}
-
 export const parseFormData = <T extends z4.$ZodType>(
   form: FormData,
   {
@@ -115,7 +103,8 @@ export const parseFormData = <T extends z4.$ZodType>(
     const matchingSchema =
       flattenedZodSchema.shape[keyWithHash] ||
       Object.entries(flattenedZodSchema.shape).find(
-        ([k]) => k.includes("*") && matchWildcardString(k, keyWithHash)
+        ([pattern]) =>
+          pattern.includes("*") && matchWildcardPath(pattern, keyWithHash)
       )?.[1];
 
     if (matchingSchema) {

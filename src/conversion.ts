@@ -3,6 +3,7 @@ import { z } from "zod/v4";
 import type { DeepPartial } from "./deep-partial";
 import { flattenZodFormData } from "./flatten-zod-form-data";
 import { flattenZodFormSchema } from "./flatten-zod-form-schema";
+import { matchWildcardPath } from "./match-wildcard-path";
 import type { FlattenedFormData } from "./schema-paths";
 import { unflattenZodFormData } from "./unflatten-zod-form-data";
 import {
@@ -17,7 +18,11 @@ const toFormDataValue = (value: unknown): string | Blob | null => {
   if (value instanceof Blob) return value;
   if (value instanceof Date) return value.toISOString();
   if (typeof value === "string") return value;
-  if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint") {
+  if (
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    typeof value === "bigint"
+  ) {
     return String(value);
   }
   return JSON.stringify(value);
@@ -50,15 +55,7 @@ export const convertFormDataToObject = <Schema extends z4.$ZodType>(
     const matchingSchema =
       flattenedSchema.shape[keyWithHash] ||
       Object.entries(flattenedSchema.shape).find(([pattern]) => {
-        if (!pattern.includes("*")) return false;
-        const patternParts = pattern.split(".");
-        const testParts = keyWithHash.split(".");
-        if (patternParts.length !== testParts.length) {
-          return false;
-        }
-        return patternParts.every((part, index) => {
-          return part === "*" || part === testParts[index];
-        });
+        return pattern.includes("*") && matchWildcardPath(pattern, keyWithHash);
       })?.[1];
 
     if (!matchingSchema) {
