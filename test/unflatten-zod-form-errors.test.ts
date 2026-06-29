@@ -135,6 +135,30 @@ describe("unflattenZodFormErrors", () => {
     expect(result).toBe("User is required");
   });
 
+  test("supports dotted roots", () => {
+    const schema = z.object({
+      user: z.object({
+        details: z.object({
+          age: z.number(),
+          city: z.string(),
+        }),
+      }),
+    });
+
+    const result = unflattenZodFormErrors<typeof schema>(
+      {
+        "user.details.age": "Age must be a number",
+        "user.details.city": "City is required",
+      },
+      "user.details"
+    );
+
+    expect(result).toEqual({
+      age: "Age must be a number",
+      city: "City is required",
+    });
+  });
+
   test.skip("does not handle nested array errors yet", () => {
     const schema = z.object({
       matrix: z.array(z.array(z.number())),

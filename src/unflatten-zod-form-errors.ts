@@ -74,7 +74,12 @@ export function unflattenZodFormErrors<T extends z4.$ZodType>(
     nest(result, key.split("."), 0, value);
   }
 
-  return root
-    ? (result[root] as DeepPartial<NestedFieldErrors<T>>)
-    : (result as DeepPartial<NestedFieldErrors<T>>);
+  if (!root) return result as DeepPartial<NestedFieldErrors<T>>;
+
+  const rootValue = root.split(".").reduce<unknown>((value, key) => {
+    if (value === null || typeof value !== "object") return undefined;
+    return (value as Record<string, unknown>)[key];
+  }, result);
+
+  return rootValue as DeepPartial<NestedFieldErrors<T>>;
 }

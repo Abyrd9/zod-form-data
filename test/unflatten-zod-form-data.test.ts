@@ -152,6 +152,30 @@ describe("unflattenZodFormData", () => {
     expect(result).toEqual({});
   });
 
+  test("supports dotted roots", () => {
+    const schema = z.object({
+      user: z.object({
+        details: z.object({
+          age: z.number(),
+          city: z.string(),
+        }),
+      }),
+    });
+
+    const result = unflattenZodFormData<typeof schema>(
+      {
+        "user.details.age": 30,
+        "user.details.city": "Boston",
+      },
+      "user.details"
+    );
+
+    expect(result).toEqual({
+      age: 30,
+      city: "Boston",
+    });
+  });
+
   test("handles empty objects", () => {
     const schema = z.object({
       user: z.object({

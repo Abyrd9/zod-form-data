@@ -73,7 +73,12 @@ export function unflattenZodFormData<T extends z4.$ZodType>(
     nest(result, key.split("."), 0, value);
   }
 
-  return root
-    ? (result[root] as DeepPartial<z4.output<T>>)
-    : (result as DeepPartial<z4.output<T>>);
+  if (!root) return result as DeepPartial<z4.output<T>>;
+
+  const rootValue = root.split(".").reduce<unknown>((value, key) => {
+    if (value === null || typeof value !== "object") return undefined;
+    return (value as Record<string, unknown>)[key];
+  }, result);
+
+  return rootValue as DeepPartial<z4.output<T>>;
 }
